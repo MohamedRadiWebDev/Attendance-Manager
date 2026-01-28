@@ -33,6 +33,8 @@ export interface IStorage {
   
   addLeaves(leaves: InsertLeave[]): Promise<void>;
   getLeaves(employeeCode: string, date: string): Promise<Leave[]>;
+  getAllMissions(): Promise<Mission[]>;
+  getAllLeaves(): Promise<Leave[]>;
   
   // Special Rules
   getSpecialRules(): Promise<SpecialRule[]>;
@@ -149,6 +151,18 @@ export class MemStorage implements IStorage {
       date >= l.startDate && 
       date <= l.endDate
     );
+  }
+
+  async getAllMissions(): Promise<Mission[]> {
+    return this.missions;
+  }
+
+  async getAllLeaves(): Promise<Leave[]> {
+    return this.leaves;
+  }
+
+  async getAllLeaves(): Promise<Leave[]> {
+    return this.leaves;
   }
 
   async getSpecialRules(): Promise<SpecialRule[]> {
