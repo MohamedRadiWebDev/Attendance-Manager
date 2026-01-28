@@ -1,4 +1,4 @@
-const rawBaseUrl = "";
+const rawBaseUrl = import.meta.env.VITE_API_BASE ?? "";
 
 const normalizedBaseUrl = rawBaseUrl.endsWith("/")
   ? rawBaseUrl.slice(0, -1)

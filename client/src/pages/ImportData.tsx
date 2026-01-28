@@ -3,6 +3,8 @@ import { useImportFile } from "@/hooks/use-import";
 import { Upload, FileSpreadsheet, Check, AlertTriangle, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildApiUrl } from "@/lib/api";
+import { OFFLINE_MODE } from "@/lib/offlineStore";
+import * as XLSX from "xlsx";
 
 const columnSpecs = {
   master: {
@@ -34,7 +36,56 @@ export default function ImportData() {
   };
 
   const downloadTemplate = (type: string) => {
-    window.open(buildApiUrl(`/api/templates/${type}`), "_blank");
+    if (!OFFLINE_MODE) {
+      window.open(buildApiUrl(`/api/templates/${type}`), "_blank");
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    let ws = XLSX.utils.aoa_to_sheet([[]]);
+    let filename = "template.xlsx";
+
+    if (type === "master") {
+      ws = XLSX.utils.aoa_to_sheet([
+        ["كود", "الاسم", "القسم", "الوظيفة", "الفرع", "تاريخ_التعيين", "بداية_الوردية", "نهاية_الوردية"],
+        ["EMP001", "أحمد محمد", "الحسابات", "محاسب", "القاهرة", "2020-01-15", "08:00", "16:00"],
+        ["EMP002", "محمد علي", "الموارد البشرية", "خدمات معاونة", "الجيزة", "2019-05-20", "08:00", "16:00"],
+      ]);
+      filename = "template_master_data.xlsx";
+    } else if (type === "punches") {
+      ws = XLSX.utils.aoa_to_sheet([
+        ["كود", "التاريخ_والوقت"],
+        ["EMP001", "2025-12-15 08:05:00"],
+        ["EMP001", "2025-12-15 16:30:00"],
+        ["EMP002", "2025-12-15 08:15:00"],
+        ["EMP002", "2025-12-15 15:45:00"],
+      ]);
+      filename = "template_punches.xlsx";
+    } else if (type === "missions") {
+      ws = XLSX.utils.aoa_to_sheet([
+        ["كود", "التاريخ", "وقت_البداية", "وقت_النهاية", "الوصف"],
+        ["EMP001", "2025-12-16", "09:00", "14:00", "مأمورية خارجية"],
+      ]);
+      filename = "template_missions.xlsx";
+    } else if (type === "leaves") {
+      ws = XLSX.utils.aoa_to_sheet([
+        ["كود", "تاريخ_البداية", "تاريخ_النهاية", "نوع_الاجازة", "ملاحظات"],
+        ["EMP001", "2025-12-20", "2025-12-22", "اجازة عارضة", ""],
+      ]);
+      filename = "template_leaves.xlsx";
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const blob = new Blob([arrayBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const tabs = [

@@ -1,6 +1,6 @@
 import { buildApiUrl } from "@/lib/api";
 
-export const MOCK_MODE = false;
+export const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === "true";
 
 export const mockEmployees: any[] = [];
 export const mockAttendance: any[] = [];
