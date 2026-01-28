@@ -1,4 +1,4 @@
-import { type SpecialRule, type Employee, type AuditTrace } from "@shared/schema";
+import { type SpecialRule, type Employee, type AuditTrace } from "../shared/schema";
 import { storage } from "./storage";
 
 export interface RuleContext {
