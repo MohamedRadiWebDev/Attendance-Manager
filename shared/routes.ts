@@ -65,6 +65,26 @@ export const api = {
     }
   },
   
+  missions: {
+    list: {
+      method: "GET" as const,
+      path: "/api/missions",
+      responses: {
+        200: z.array(z.custom<typeof missions.$inferSelect>()),
+      }
+    }
+  },
+
+  leaves: {
+    list: {
+      method: "GET" as const,
+      path: "/api/leaves",
+      responses: {
+        200: z.array(z.custom<typeof leaves.$inferSelect>()),
+      }
+    }
+  },
+  
   attendance: {
     // Get calculated daily grid
     list: {

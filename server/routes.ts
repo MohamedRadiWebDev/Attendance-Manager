@@ -187,10 +187,20 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  // === EMPLOYEES ===
+  // === DATA RETRIEVAL ===
   app.get(api.employees.list.path, async (req, res) => {
     const employees = await storage.getEmployees();
     res.json(employees);
+  });
+
+  app.get("/api/missions", async (req, res) => {
+    const data = await storage.getAllMissions();
+    res.json(data);
+  });
+
+  app.get("/api/leaves", async (req, res) => {
+    const data = await storage.getAllLeaves();
+    res.json(data);
   });
 
   // === ATTENDANCE CALCULATION ENGINE ===
@@ -278,6 +288,7 @@ export async function registerRoutes(
         const missions = await storage.getMissions(emp.code, dateStr);
         if (missions.length > 0) {
           audit.appliedMissions = missions.map(m => `${m.startTime}-${m.endTime}: ${m.description}`);
+          // Consider a mission as a valid punch even if biometric is missing
           if (missions[0].startTime && (!checkIn || missions[0].startTime < checkIn)) {
             checkIn = missions[0].startTime;
             audit.firstStampSource = "mission";
