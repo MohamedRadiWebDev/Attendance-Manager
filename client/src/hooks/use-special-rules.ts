@@ -3,10 +3,17 @@ import { api, buildUrl } from "@shared/routes";
 import { type InsertSpecialRule, type SpecialRule } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getApiFetch, MOCK_MODE, mockSpecialRules } from "@/lib/mockData";
 
 export function useSpecialRules() {
   return useQuery<SpecialRule[]>({
     queryKey: [api.specialRules.list.path],
+    queryFn: async () => {
+      if (MOCK_MODE) return mockSpecialRules;
+      const res = await fetch(api.specialRules.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("فشل جلب القواعد");
+      return res.json();
+    },
   });
 }
 
