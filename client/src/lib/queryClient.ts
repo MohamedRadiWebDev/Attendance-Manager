@@ -10,6 +10,8 @@ export async function apiRequest(
   let result: any;
   const path = url.split("?")[0];
 
+  console.log(`API Request: ${method} ${path}`, data);
+
   // Map Requests to LocalStorage
   if (path === "/api/employees" && (method === "POST" || method === "PATCH")) {
     result = await localStore.upsertEmployee(data);
@@ -59,6 +61,8 @@ export const getQueryFn: <T>(options: any) => QueryFunction<T> =
     const path = queryKey[0] as string;
     let data: any;
 
+    console.log(`Query Fetch: ${path}`);
+
     if (path === "/api/employees") data = await localStore.getEmployees();
     else if (path === "/api/punches") data = await localStore.getAllPunches();
     else if (path === "/api/attendance") data = await localStore.getDailyAttendance();
@@ -72,6 +76,7 @@ export const getQueryFn: <T>(options: any) => QueryFunction<T> =
       return res.json();
     }
 
+    console.log(`Query Result for ${path}:`, data);
     return data;
   };
 
@@ -79,9 +84,9 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "returnNull" }),
-      refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      refetchInterval: 1000, // Frequent polling for local storage changes
+      refetchOnWindowFocus: true,
+      staleTime: 0,
       retry: false,
     },
     mutations: {

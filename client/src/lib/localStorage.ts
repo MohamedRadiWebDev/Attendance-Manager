@@ -23,11 +23,23 @@ const KEYS = {
 class LocalStorageProvider {
   private getItem<T>(key: string, defaultValue: T): T {
     const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : defaultValue;
+    if (!data) return defaultValue;
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error(`Error parsing localStorage key "${key}":`, e);
+      return defaultValue;
+    }
   }
 
   private setItem<T>(key: string, value: T): void {
-    localStorage.setItem(key, JSON.stringify(value));
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      // Dispatch storage event for same-window updates
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {
+      console.error(`Error setting localStorage key "${key}":`, e);
+    }
   }
 
   private getNextId(type: string): number {
@@ -178,6 +190,7 @@ class LocalStorageProvider {
 
   async clearAll(): Promise<void> {
     Object.values(KEYS).forEach(key => localStorage.removeItem(key));
+    window.dispatchEvent(new Event('storage'));
   }
 }
 
