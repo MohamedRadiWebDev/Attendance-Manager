@@ -1,7 +1,4 @@
-import * as XLSX from "xlsx";
-
-const mockEnv = import.meta.env.VITE_MOCK_MODE;
-export const MOCK_MODE = mockEnv ? mockEnv === "true" : true;
+export const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === "true";
 
 export const mockEmployees: any[] = [];
 export const mockAttendance: any[] = [];
@@ -15,21 +12,6 @@ function jsonResponse(data: unknown, init?: ResponseInit) {
   });
 }
 
-async function parseImportFile(options?: RequestInit) {
-  if (!options?.body || !(options.body instanceof FormData)) {
-    return { count: 0, errors: ["No file provided"] };
-  }
-  const file = options.body.get("file");
-  if (!(file instanceof File)) {
-    return { count: 0, errors: ["Invalid file"] };
-  }
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
-  return { count: rows.length, errors: [] };
-}
-
 export async function mockFetch(url: string, options?: RequestInit): Promise<Response> {
   await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -40,8 +22,7 @@ export async function mockFetch(url: string, options?: RequestInit): Promise<Res
     return jsonResponse({ success: true });
   }
   if (url.includes("/api/import/")) {
-    const importResult = await parseImportFile(options);
-    return jsonResponse({ success: true, ...importResult });
+    return jsonResponse({ success: true, count: 0, errors: [] });
   }
   if (url.includes("/api/employees")) {
     return jsonResponse(mockEmployees);
