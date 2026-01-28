@@ -7,7 +7,7 @@ import {
   type Mission, type InsertMission,
   type Permission, type InsertPermission,
   type Leave, type InsertLeave
-} from "@shared/schema";
+} from "../shared/schema";
 
 export interface IStorage {
   // Master Data
