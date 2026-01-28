@@ -12,6 +12,7 @@ import type {
   Punch,
   SpecialRule,
 } from "@shared/schema";
+import { calculateAttendanceRecords } from "@/lib/attendanceEngine";
 
 const STORAGE_KEY = "attendance-offline-state";
 
@@ -165,110 +166,15 @@ export function getSpecialRules(): SpecialRule[] {
   return loadState().specialRules;
 }
 
-function toMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map((part) => parseInt(part, 10));
-  return hours * 60 + minutes;
-}
-
-function getTimeParts(timestamp: string) {
-  if (timestamp.includes("T")) {
-    const [date, time] = timestamp.split("T");
-    return { date, time: time.substring(0, 5) };
-  }
-  const parsed = new Date(timestamp);
-  if (Number.isNaN(parsed.getTime())) {
-    return { date: "", time: "" };
-  }
-  const date = parsed.toISOString().split("T")[0];
-  const time = parsed.toISOString().split("T")[1].substring(0, 5);
-  return { date, time };
-}
-
 export function calculateAttendance(): DailyAttendance[] {
   const state = loadState();
-  const punchMap = new Map<string, string[]>();
-  const dates = new Set<string>();
-
-  state.punches.forEach((punch) => {
-    const { date, time } = getTimeParts(punch.timestamp);
-    if (!date || !time) return;
-    const key = `${punch.employeeCode}_${date}`;
-    if (!punchMap.has(key)) {
-      punchMap.set(key, []);
-    }
-    punchMap.get(key)?.push(time);
-    dates.add(date);
-  });
-
-  const attendance: DailyAttendance[] = [];
-  const sortedDates = Array.from(dates).sort();
-
-  state.employees.forEach((employee) => {
-    sortedDates.forEach((date) => {
-      const key = `${employee.code}_${date}`;
-      const times = (punchMap.get(key) || []).sort();
-      if (times.length === 0) return;
-
-      const shiftStart = employee.shiftStart || "08:00";
-      const shiftEnd = employee.shiftEnd || "16:00";
-      const firstPunch = times[0] ?? null;
-      const lastPunch = times[times.length - 1] ?? null;
-
-      let latePenalty = 0;
-      let earlyPenalty = 0;
-      let missingPunchPenalty = 0;
-      let absencePenalty = 0;
-
-      if (firstPunch && lastPunch) {
-        const startMinutes = toMinutes(shiftStart);
-        const endMinutes = toMinutes(shiftEnd);
-        const inMinutes = toMinutes(firstPunch);
-        const outMinutes = toMinutes(lastPunch);
-
-        const lateMins = Math.max(0, inMinutes - startMinutes);
-        if (lateMins > 60) latePenalty = 1.0;
-        else if (lateMins > 30) latePenalty = 0.5;
-        else if (lateMins > 15) latePenalty = 0.25;
-
-        const earlyMins = Math.max(0, endMinutes - outMinutes);
-        if (earlyMins > 5) earlyPenalty = 0.5;
-      } else if (firstPunch || lastPunch) {
-        missingPunchPenalty = 0.5;
-      } else {
-        absencePenalty = 1;
-      }
-
-      const totalDeduction = latePenalty + earlyPenalty + missingPunchPenalty + absencePenalty;
-
-      attendance.push({
-        id: state.counters.att++,
-        employeeCode: employee.code,
-        date,
-        firstPunch,
-        lastPunch,
-        shiftStart,
-        shiftEnd,
-        actualStart: firstPunch,
-        actualEnd: lastPunch,
-        isAbsent: absencePenalty > 0,
-        isMission: false,
-        isPermission: false,
-        isLeave: false,
-        isWeekend: false,
-        isHoliday: false,
-        suppressPenalties: false,
-        latePenalty,
-        earlyPenalty,
-        missingPunchPenalty,
-        absencePenalty,
-        totalDeduction,
-        earlyOvertime: 0,
-        lateOvertime: 0,
-        totalOvertime: 0,
-        logs: ["Offline calculation"],
-      });
-    });
-  });
+  const attendance = calculateAttendanceRecords({
+    employees: state.employees,
+    punches: state.punches,
+    missions: state.missions,
+    leaves: state.leaves,
+    specialRules: state.specialRules,
+  }).map((record) => ({ ...record, id: state.counters.att++ }));
 
   state.attendance = attendance;
   saveState(state);
