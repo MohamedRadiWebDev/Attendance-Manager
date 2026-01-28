@@ -1,11 +1,30 @@
 import { useState } from "react";
 import { useImportFile } from "@/hooks/use-import";
-import { Upload, FileSpreadsheet, Check, AlertTriangle } from "lucide-react";
+import { Upload, FileSpreadsheet, Check, AlertTriangle, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const columnSpecs = {
+  master: {
+    required: ["كود", "الاسم"],
+    optional: ["القسم", "الوظيفة", "الفرع", "تاريخ_التعيين", "بداية_الوردية", "نهاية_الوردية"],
+  },
+  punches: {
+    required: ["كود", "التاريخ_والوقت"],
+    optional: [],
+  },
+  missions: {
+    required: ["كود", "التاريخ"],
+    optional: ["وقت_البداية", "وقت_النهاية", "الوصف"],
+  },
+  leaves: {
+    required: ["كود", "تاريخ_البداية", "تاريخ_النهاية"],
+    optional: ["نوع_الاجازة", "ملاحظات"],
+  },
+};
+
 export default function ImportData() {
-  const { mutate: uploadFile, isPending } = useImportFile();
-  const [activeTab, setActiveTab] = useState<'punches' | 'master' | 'missions' | 'leaves'>('punches');
+  const { mutate: uploadFile, isPending, data: lastResult } = useImportFile();
+  const [activeTab, setActiveTab] = useState<'punches' | 'master' | 'missions' | 'leaves'>('master');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -13,12 +32,18 @@ export default function ImportData() {
     }
   };
 
+  const downloadTemplate = (type: string) => {
+    window.open(`/api/templates/${type}`, '_blank');
+  };
+
   const tabs = [
-    { id: 'punches', label: 'حركات البصمة', icon: FileSpreadsheet },
     { id: 'master', label: 'بيانات الموظفين', icon: Upload },
+    { id: 'punches', label: 'حركات البصمة', icon: FileSpreadsheet },
     { id: 'missions', label: 'المأموريات', icon: FileSpreadsheet },
     { id: 'leaves', label: 'الأجازات', icon: FileSpreadsheet },
   ] as const;
+
+  const currentSpec = columnSpecs[activeTab];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -33,6 +58,7 @@ export default function ImportData() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              data-testid={`tab-${tab.id}`}
               className={cn(
                 "flex-1 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2",
                 activeTab === tab.id
@@ -46,37 +72,106 @@ export default function ImportData() {
           ))}
         </div>
 
-        <div className="p-12 flex flex-col items-center justify-center text-center">
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-            <Upload className="w-10 h-10 text-primary" />
-          </div>
-          
-          <h3 className="text-xl font-bold text-foreground mb-2">
-            اختر ملف {tabs.find(t => t.id === activeTab)?.label}
-          </h3>
-          <p className="text-muted-foreground max-w-sm mb-8">
-            يجب أن يكون الملف بصيغة Excel (.xlsx, .xls) ويحتوي على الأعمدة المطلوبة بالتنسيق الصحيح.
-          </p>
+        <div className="p-8">
+          <div className="flex flex-col lg:flex-row gap-8">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-border rounded-xl">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <Upload className="w-8 h-8 text-primary" />
+              </div>
+              
+              <h3 className="text-lg font-bold text-foreground mb-2">
+                رفع ملف {tabs.find(t => t.id === activeTab)?.label}
+              </h3>
+              <p className="text-muted-foreground text-sm max-w-sm mb-6">
+                اسحب الملف هنا أو اضغط للاختيار
+              </p>
 
-          <div className="relative">
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              disabled={isPending}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-            />
-            <button
-              disabled={isPending}
-              className={cn(
-                "px-8 py-3 rounded-xl font-semibold shadow-lg transition-all duration-200 ease-out",
-                isPending 
-                  ? "bg-muted text-muted-foreground cursor-not-allowed"
-                  : "bg-primary text-primary-foreground hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0"
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileChange}
+                  disabled={isPending}
+                  data-testid={`input-file-${activeTab}`}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                />
+                <button
+                  disabled={isPending}
+                  data-testid={`button-upload-${activeTab}`}
+                  className={cn(
+                    "px-6 py-2.5 rounded-lg font-semibold transition-all duration-200",
+                    isPending 
+                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                      : "bg-primary text-primary-foreground hover:opacity-90"
+                  )}
+                >
+                  {isPending ? "جاري الرفع..." : "اختر الملف"}
+                </button>
+              </div>
+
+              {lastResult && (
+                <div className={cn(
+                  "mt-6 p-4 rounded-lg w-full text-right",
+                  lastResult.count > 0 ? "bg-green-50 dark:bg-green-900/20" : "bg-amber-50 dark:bg-amber-900/20"
+                )}>
+                  <p className={cn(
+                    "font-semibold",
+                    lastResult.count > 0 ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"
+                  )}>
+                    {lastResult.count > 0 ? (
+                      <>تم استيراد {lastResult.count} سجل بنجاح</>
+                    ) : (
+                      <>لم يتم استيراد أي سجلات - تحقق من أسماء الأعمدة</>
+                    )}
+                  </p>
+                  {lastResult.errors && lastResult.errors.length > 0 && (
+                    <ul className="mt-2 text-sm text-red-600 dark:text-red-400 space-y-1">
+                      {lastResult.errors.slice(0, 5).map((err: string, i: number) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                      {lastResult.errors.length > 5 && (
+                        <li>... و {lastResult.errors.length - 5} أخطاء أخرى</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
               )}
-            >
-              {isPending ? "جاري الرفع..." : "اختر الملف من جهازك"}
-            </button>
+            </div>
+
+            <div className="lg:w-80 space-y-4">
+              <div className="bg-muted/50 rounded-xl p-4">
+                <h4 className="font-bold text-sm mb-3 text-foreground">الأعمدة المطلوبة</h4>
+                <div className="flex flex-wrap gap-2">
+                  {currentSpec.required.map((col) => (
+                    <span key={col} className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-xs font-medium">
+                      {col}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {currentSpec.optional.length > 0 && (
+                <div className="bg-muted/50 rounded-xl p-4">
+                  <h4 className="font-bold text-sm mb-3 text-foreground">أعمدة اختيارية</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {currentSpec.optional.map((col) => (
+                      <span key={col} className="px-2 py-1 bg-muted text-muted-foreground rounded text-xs font-medium">
+                        {col}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => downloadTemplate(activeTab)}
+                data-testid={`button-download-template-${activeTab}`}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:opacity-90 transition-opacity"
+              >
+                <Download className="w-4 h-4" />
+                تحميل نموذج القالب
+              </button>
+            </div>
           </div>
         </div>
 
@@ -87,8 +182,10 @@ export default function ImportData() {
           </h4>
           <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
             <li>تأكد من عدم وجود صفوف فارغة في بداية الملف.</li>
-            <li>صيغة التاريخ يجب أن تكون YYYY-MM-DD.</li>
-            <li>تأكد من مطابقة كود الموظف في جميع الملفات.</li>
+            <li>أسماء الأعمدة يجب أن تكون في الصف الأول تماماً.</li>
+            <li>صيغة التاريخ: YYYY-MM-DD أو DD/MM/YYYY.</li>
+            <li>صيغة الوقت: HH:mm أو HH:mm:ss.</li>
+            <li>حمّل القالب واملأه ببياناتك للتأكد من التنسيق الصحيح.</li>
           </ul>
         </div>
       </div>

@@ -25,11 +25,17 @@ export function useImportFile() {
       return api.import.upload.responses[200].parse(await res.json());
     },
     onSuccess: (data) => {
-      if (data.errors && data.errors.length > 0) {
+      if (data.count === 0) {
+        toast({
+          title: "لم يتم استيراد أي سجلات",
+          description: "تحقق من أسماء الأعمدة في ملف Excel.",
+          variant: "destructive",
+        });
+      } else if (data.errors && data.errors.length > 0) {
         toast({
           title: "تم الاستيراد مع وجود تحذيرات",
           description: `تمت معالجة ${data.count} سجل، ولكن وجدت بعض الأخطاء.`,
-          variant: "warning",
+          variant: "default",
         });
       } else {
         toast({
