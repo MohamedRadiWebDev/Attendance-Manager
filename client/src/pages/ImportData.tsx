@@ -33,7 +33,7 @@ export default function ImportData() {
   };
 
   const downloadTemplate = (type: string) => {
-    window.open(`/api/templates/${type}`, '_blank');
+    window.open(`/api/templates/${type}`, "_blank");
   };
 
   const tabs = [
