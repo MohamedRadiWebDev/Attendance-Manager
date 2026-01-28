@@ -63,7 +63,7 @@ export default function Attendance() {
 
   const employeeMap = useMemo(() => {
     const map = new Map<string, { name: string; department: string; branch: string }>();
-    employees?.forEach(e => {
+    employees?.forEach((e: any) => {
       map.set(e.code, { name: e.name, department: e.department || "", branch: e.branch || "" });
     });
     return map;
@@ -131,7 +131,7 @@ export default function Attendance() {
     );
   };
 
-  const audit = selectedRecord ? parseAudit(selectedRecord.logs) : null;
+  const audit = selectedRecord ? parseAudit(selectedRecord.logs || null) : null;
 
   return (
     <div className="space-y-8 h-full flex flex-col animate-in fade-in duration-500">
