@@ -187,10 +187,20 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  // === EMPLOYEES ===
+  // === DATA RETRIEVAL ===
   app.get(api.employees.list.path, async (req, res) => {
     const employees = await storage.getEmployees();
     res.json(employees);
+  });
+
+  app.get("/api/missions", async (req, res) => {
+    const data = await storage.getAllMissions();
+    res.json(data);
+  });
+
+  app.get("/api/leaves", async (req, res) => {
+    const data = await storage.getAllLeaves();
+    res.json(data);
   });
 
   // === ATTENDANCE CALCULATION ENGINE ===
@@ -278,6 +288,7 @@ export async function registerRoutes(
         const missions = await storage.getMissions(emp.code, dateStr);
         if (missions.length > 0) {
           audit.appliedMissions = missions.map(m => `${m.startTime}-${m.endTime}: ${m.description}`);
+          // Consider a mission as a valid punch even if biometric is missing
           if (missions[0].startTime && (!checkIn || missions[0].startTime < checkIn)) {
             checkIn = missions[0].startTime;
             audit.firstStampSource = "mission";
@@ -475,11 +486,64 @@ export async function registerRoutes(
   });
 
   app.get(api.attendance.list.path, async (req, res) => {
-    const data = await storage.getDailyAttendance();
+    const month = req.query.month as string;
+    const data = await storage.getDailyAttendance(month);
     res.json(data);
   });
-  
-  // === TEMPLATES ===
+
+  // === EXPORTS ===
+  app.get(api.export.attendance.path, async (req, res) => {
+    const data = await storage.getDailyAttendance();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data.map(d => ({
+      'كود الموظف': d.employeeCode,
+      'التاريخ': d.date,
+      'الدخول': d.firstPunch,
+      'الخروج': d.lastPunch,
+      'الخصم (أيام)': d.totalDeduction,
+      'الإضافي (ساعات)': Number(d.totalOvertime).toFixed(2),
+      'الحالة': d.isAbsent ? 'غياب' : d.isLeave ? 'إجازة' : 'حضور'
+    })));
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=attendance.xlsx");
+    res.send(buf);
+  });
+
+  app.get(api.export.summary.path, async (req, res) => {
+    const data = await storage.getDailyAttendance();
+    const employees = await storage.getEmployees();
+    
+    const summaryMap = new Map();
+    employees.forEach(emp => {
+      summaryMap.set(emp.code, {
+        'كود الموظف': emp.code,
+        'الاسم': emp.name,
+        'القسم': emp.department,
+        'إجمالي الغياب (أيام)': 0,
+        'إجمالي الإجازات (أيام)': 0,
+        'إجمالي الخصومات (أيام)': 0,
+        'إجمالي الإضافي (ساعات)': 0
+      });
+    });
+
+    data.forEach(d => {
+      const s = summaryMap.get(d.employeeCode);
+      if (s) {
+        if (d.isAbsent) s['إجمالي الغياب (أيام)'] += 1;
+        if (d.isLeave) s['إجمالي الإجازات (أيام)'] += 1;
+        s['إجمالي الخصومات (أيام)'] += (d.totalDeduction || 0);
+        s['إجمالي الإضافي (ساعات)'] += (Number(d.totalOvertime) || 0);
+      }
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(Array.from(summaryMap.values()));
+    XLSX.utils.book_append_sheet(wb, ws, "Salary Summary");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=salary_summary.xlsx");
+    res.send(buf);
+  });
   app.get("/api/templates/:type", async (req, res) => {
     const type = req.params.type;
     const wb = XLSX.utils.book_new();
