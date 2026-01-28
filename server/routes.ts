@@ -474,12 +474,59 @@ export async function registerRoutes(
     res.json({ success: true, processedCount: results.length });
   });
 
-  app.get(api.attendance.list.path, async (req, res) => {
+  // === EXPORTS ===
+  app.get(api.export.attendance.path, async (req, res) => {
     const data = await storage.getDailyAttendance();
-    res.json(data);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data.map(d => ({
+      'كود الموظف': d.employeeCode,
+      'التاريخ': d.date,
+      'الدخول': d.firstPunch,
+      'الخروج': d.lastPunch,
+      'الخصم (أيام)': d.totalDeduction,
+      'الإضافي (ساعات)': Number(d.totalOvertime).toFixed(2),
+      'الحالة': d.isAbsent ? 'غياب' : d.isLeave ? 'إجازة' : 'حضور'
+    })));
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=attendance.xlsx");
+    res.send(buf);
   });
-  
-  // === TEMPLATES ===
+
+  app.get(api.export.summary.path, async (req, res) => {
+    const data = await storage.getDailyAttendance();
+    const employees = await storage.getEmployees();
+    
+    const summaryMap = new Map();
+    employees.forEach(emp => {
+      summaryMap.set(emp.code, {
+        'كود الموظف': emp.code,
+        'الاسم': emp.name,
+        'القسم': emp.department,
+        'إجمالي الغياب (أيام)': 0,
+        'إجمالي الإجازات (أيام)': 0,
+        'إجمالي الخصومات (أيام)': 0,
+        'إجمالي الإضافي (ساعات)': 0
+      });
+    });
+
+    data.forEach(d => {
+      const s = summaryMap.get(d.employeeCode);
+      if (s) {
+        if (d.isAbsent) s['إجمالي الغياب (أيام)'] += 1;
+        if (d.isLeave) s['إجمالي الإجازات (أيام)'] += 1;
+        s['إجمالي الخصومات (أيام)'] += (d.totalDeduction || 0);
+        s['إجمالي الإضافي (ساعات)'] += (Number(d.totalOvertime) || 0);
+      }
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(Array.from(summaryMap.values()));
+    XLSX.utils.book_append_sheet(wb, ws, "Salary Summary");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=salary_summary.xlsx");
+    res.send(buf);
+  });
   app.get("/api/templates/:type", async (req, res) => {
     const type = req.params.type;
     const wb = XLSX.utils.book_new();

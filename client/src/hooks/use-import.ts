@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { getApiFetch, MOCK_MODE } from "@/lib/mockData";
@@ -7,6 +7,7 @@ type ImportType = 'punches' | 'master' | 'missions' | 'leaves';
 
 export function useImportFile() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ type, file }: { type: ImportType; file: File }) => {
@@ -28,6 +29,9 @@ export function useImportFile() {
       return MOCK_MODE ? data : api.import.upload.responses[200].parse(data);
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.employees.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.attendance.list.path] });
+      
       if (data.count === 0) {
         toast({
           title: "لم يتم استيراد أي سجلات",

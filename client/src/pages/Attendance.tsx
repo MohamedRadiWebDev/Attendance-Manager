@@ -54,6 +54,9 @@ function parseAudit(logs: string[] | null): AuditTrace | null {
 export default function Attendance() {
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+
   const { data: attendance, isLoading } = useAttendance();
   const { data: employees } = useEmployees();
   const { mutate: calculate, isPending: isCalculating } = useCalculateAttendance();
@@ -88,6 +91,13 @@ export default function Attendance() {
       return searchIndex.includes(normalizedSearch);
     });
   }, [attendance, search, getEmployeeInfo]);
+
+  const paginatedData = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, page]);
+
+  const totalPages = Math.ceil(filteredData.length / pageSize);
 
   const getStatusBadge = (record: any) => {
     if (record.isAbsent) return (
@@ -187,14 +197,14 @@ export default function Attendance() {
                     <p className="mt-2 text-muted-foreground">جاري تحميل البيانات...</p>
                   </td>
                 </tr>
-              ) : filteredData.length === 0 ? (
+              ) : paginatedData.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="text-center py-20 text-muted-foreground">
                     لا توجد سجلات مطابقة
                   </td>
                 </tr>
               ) : (
-                filteredData.map((record) => {
+                paginatedData.map((record) => {
                   const emp = getEmployeeInfo(record.employeeCode);
                   return (
                     <tr key={record.id} className="group hover:bg-muted/30 transition-colors" data-testid={`row-attendance-${record.id}`}>
@@ -254,6 +264,35 @@ export default function Attendance() {
             </tbody>
           </table>
         </div>
+        
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-border flex items-center justify-between bg-muted/10">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                السابق
+              </Button>
+              <div className="flex items-center gap-1 px-4 text-sm font-medium">
+                صفحة {page} من {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                التالي
+              </Button>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              عرض {paginatedData.length} من أصل {filteredData.length} سجل
+            </div>
+          </div>
+        )}
       </div>
 
       <Dialog open={!!selectedRecord} onOpenChange={() => setSelectedRecord(null)}>
