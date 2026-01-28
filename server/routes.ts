@@ -474,6 +474,12 @@ export async function registerRoutes(
     res.json({ success: true, processedCount: results.length });
   });
 
+  app.get(api.attendance.list.path, async (req, res) => {
+    const month = req.query.month as string;
+    const data = await storage.getDailyAttendance(month);
+    res.json(data);
+  });
+
   // === EXPORTS ===
   app.get(api.export.attendance.path, async (req, res) => {
     const data = await storage.getDailyAttendance();

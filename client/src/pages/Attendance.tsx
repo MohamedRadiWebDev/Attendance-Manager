@@ -75,11 +75,15 @@ export default function Attendance() {
 
   const filteredData = useMemo(() => {
     if (!attendance) return [];
-    if (!search) return attendance;
+    
+    // Sort attendance by date descending
+    const sorted = [...attendance].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    if (!search) return sorted;
 
     const normalizedSearch = normalizeArabic(search);
     
-    return attendance.filter(record => {
+    return sorted.filter(record => {
       const emp = getEmployeeInfo(record.employeeCode);
       const searchIndex = buildSearchIndex([
         record.employeeCode,
