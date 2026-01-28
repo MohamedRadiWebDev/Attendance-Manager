@@ -39,7 +39,7 @@ class LocalStorageProvider {
   }
 
   async getEmployees(): Promise<Employee[]> {
-    return this.getItem(KEYS.EMPLOYEES, []);
+    return this.getItem<Employee[]>(KEYS.EMPLOYEES, []);
   }
 
   async getEmployee(code: string): Promise<Employee | undefined> {
@@ -56,7 +56,7 @@ class LocalStorageProvider {
       result = { ...employees[existingIdx], ...employee };
       employees[existingIdx] = result;
     } else {
-      result = { ...employee, id: this.getNextId('emp') };
+      result = { ...employee, id: this.getNextId('emp') } as Employee;
       employees.push(result);
     }
     this.setItem(KEYS.EMPLOYEES, employees);
@@ -66,7 +66,7 @@ class LocalStorageProvider {
   async addPunches(newPunches: InsertPunch[]): Promise<void> {
     const punches = this.getItem<Punch[]>(KEYS.PUNCHES, []);
     newPunches.forEach(p => {
-      punches.push({ ...p, id: this.getNextId('punch') });
+      punches.push({ ...p, id: this.getNextId('punch') } as Punch);
     });
     this.setItem(KEYS.PUNCHES, punches);
   }
@@ -91,7 +91,7 @@ class LocalStorageProvider {
     records.forEach(r => {
       const key = `${r.employeeCode}_${r.date}`;
       const id = map.get(key)?.id || this.getNextId('att');
-      map.set(key, { ...r, id });
+      map.set(key, { ...r, id } as DailyAttendance);
     });
     
     this.setItem(KEYS.ATTENDANCE, Array.from(map.values()));
@@ -103,32 +103,32 @@ class LocalStorageProvider {
 
   async addMissions(items: InsertMission[]): Promise<void> {
     const missions = this.getItem<Mission[]>(KEYS.MISSIONS, []);
-    items.forEach(i => missions.push({ ...i, id: this.getNextId('mission') }));
+    items.forEach(i => missions.push({ ...i, id: this.getNextId('mission') } as Mission));
     this.setItem(KEYS.MISSIONS, missions);
   }
 
   async getAllMissions(): Promise<Mission[]> {
-    return this.getItem(KEYS.MISSIONS, []);
+    return this.getItem<Mission[]>(KEYS.MISSIONS, []);
   }
 
   async addPermissions(items: InsertPermission[]): Promise<void> {
     const perms = this.getItem<Permission[]>(KEYS.PERMISSIONS, []);
-    items.forEach(i => perms.push({ ...i, id: this.getNextId('perm') }));
+    items.forEach(i => perms.push({ ...i, id: this.getNextId('perm') } as Permission));
     this.setItem(KEYS.PERMISSIONS, perms);
   }
 
   async getAllPermissions(): Promise<Permission[]> {
-    return this.getItem(KEYS.PERMISSIONS, []);
+    return this.getItem<Permission[]>(KEYS.PERMISSIONS, []);
   }
 
   async addLeaves(items: InsertLeave[]): Promise<void> {
     const leaves = this.getItem<Leave[]>(KEYS.LEAVES, []);
-    items.forEach(i => leaves.push({ ...i, id: this.getNextId('leave') }));
+    items.forEach(i => leaves.push({ ...i, id: this.getNextId('leave') } as Leave));
     this.setItem(KEYS.LEAVES, leaves);
   }
 
   async getAllLeaves(): Promise<Leave[]> {
-    return this.getItem(KEYS.LEAVES, []);
+    return this.getItem<Leave[]>(KEYS.LEAVES, []);
   }
 
   async getMissions(code: string, date: string): Promise<Mission[]> {
@@ -151,7 +151,7 @@ class LocalStorageProvider {
   }
 
   async getSpecialRules(): Promise<SpecialRule[]> {
-    return this.getItem(KEYS.RULES, []);
+    return this.getItem<SpecialRule[]>(KEYS.RULES, []);
   }
 
   async addSpecialRule(rule: InsertSpecialRule): Promise<SpecialRule> {
@@ -165,7 +165,7 @@ class LocalStorageProvider {
       daysOfWeek: rule.daysOfWeek ?? null,
       params: rule.params ?? null,
       notes: rule.notes ?? null
-    };
+    } as SpecialRule;
     rules.push(newRule);
     this.setItem(KEYS.RULES, rules);
     return newRule;

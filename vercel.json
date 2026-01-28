@@ -1,9 +1,8 @@
 {
-  "buildCommand": "npx vite build --config vite.config.vercel.ts",
+  "buildCommand": "vite build",
   "outputDirectory": "dist/public",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
