@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { getApiFetch, MOCK_MODE } from "@/lib/mockData";
-import { OFFLINE_MODE, addLeaves, addMissions, addPunches, upsertEmployees } from "@/lib/offlineStore";
+import { addLeaves, addMissions, addPunches, enableOfflineMode, isOfflineModeEnabled, upsertEmployees } from "@/lib/offlineStore";
 import * as XLSX from "xlsx";
 
 type ImportType = 'punches' | 'master' | 'missions' | 'leaves';
@@ -160,7 +160,7 @@ export function useImportFile() {
         return { success: true, count: processedCount, errors };
       };
 
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         return handleOfflineImport();
       }
 
@@ -177,6 +177,7 @@ export function useImportFile() {
         const data = await res.json();
         return MOCK_MODE ? data : api.import.upload.responses[200].parse(data);
       } catch (error) {
+        enableOfflineMode();
         const data = await handleOfflineImport();
         return data;
       }

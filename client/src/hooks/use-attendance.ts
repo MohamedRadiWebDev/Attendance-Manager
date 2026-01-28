@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { getApiFetch, MOCK_MODE } from "@/lib/mockData";
-import { OFFLINE_MODE, calculateAttendance as calculateOfflineAttendance, exportAttendance, exportSummary, getAttendance as getOfflineAttendance } from "@/lib/offlineStore";
+import { calculateAttendance as calculateOfflineAttendance, enableOfflineMode, exportAttendance, exportSummary, getAttendance as getOfflineAttendance, isOfflineModeEnabled } from "@/lib/offlineStore";
 
 export function useAttendance(month?: string) {
   return useQuery({
@@ -13,7 +13,7 @@ export function useAttendance(month?: string) {
         ? buildUrl(api.attendance.list.path) + `?month=${month}`
         : api.attendance.list.path;
 
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         return getOfflineAttendance(month);
       }
 
@@ -23,6 +23,7 @@ export function useAttendance(month?: string) {
         const data = await res.json();
         return MOCK_MODE ? data : api.attendance.list.responses[200].parse(data);
       } catch {
+        enableOfflineMode();
         return getOfflineAttendance(month);
       }
     },
@@ -35,7 +36,7 @@ export function useCalculateAttendance() {
 
   return useMutation({
     mutationFn: async () => {
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         const records = calculateOfflineAttendance();
         return { success: true, processedCount: records.length };
       }
@@ -50,6 +51,7 @@ export function useCalculateAttendance() {
         const data = await res.json();
         return MOCK_MODE ? data : api.attendance.calculate.responses[200].parse(data);
       } catch {
+        enableOfflineMode();
         const records = calculateOfflineAttendance();
         return { success: true, processedCount: records.length };
       }
@@ -75,7 +77,7 @@ export function useCalculateAttendance() {
 export function useExportAttendance() {
   return useMutation({
     mutationFn: async () => {
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         return exportAttendance();
       }
       const apiFetch = getApiFetch();
@@ -84,6 +86,7 @@ export function useExportAttendance() {
         if (!res.ok) throw new Error("فشل تصدير البيانات");
         return await res.blob();
       } catch {
+        enableOfflineMode();
         return exportAttendance();
       }
     },
@@ -93,7 +96,7 @@ export function useExportAttendance() {
 export function useExportSummary() {
   return useMutation({
     mutationFn: async () => {
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         return exportSummary();
       }
       const apiFetch = getApiFetch();
@@ -102,6 +105,7 @@ export function useExportSummary() {
         if (!res.ok) throw new Error("فشل تصدير الملخص");
         return await res.blob();
       } catch {
+        enableOfflineMode();
         return exportSummary();
       }
     },

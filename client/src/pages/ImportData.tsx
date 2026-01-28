@@ -3,7 +3,7 @@ import { useImportFile } from "@/hooks/use-import";
 import { Upload, FileSpreadsheet, Check, AlertTriangle, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildApiUrl } from "@/lib/api";
-import { OFFLINE_MODE } from "@/lib/offlineStore";
+import { isOfflineModeEnabled } from "@/lib/offlineStore";
 import * as XLSX from "xlsx";
 
 const columnSpecs = {
@@ -36,7 +36,7 @@ export default function ImportData() {
   };
 
   const downloadTemplate = (type: string) => {
-    if (!OFFLINE_MODE) {
+    if (!isOfflineModeEnabled()) {
       window.open(buildApiUrl(`/api/templates/${type}`), "_blank");
       return;
     }

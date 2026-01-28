@@ -17,6 +17,19 @@ const STORAGE_KEY = "attendance-offline-state";
 
 export const OFFLINE_MODE = import.meta.env.VITE_OFFLINE_MODE === "true";
 
+const OFFLINE_FLAG_KEY = "attendance-offline-enabled";
+
+export function isOfflineModeEnabled() {
+  if (OFFLINE_MODE) return true;
+  if (typeof localStorage === "undefined") return false;
+  return localStorage.getItem(OFFLINE_FLAG_KEY) === "true";
+}
+
+export function enableOfflineMode() {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(OFFLINE_FLAG_KEY, "true");
+}
+
 type OfflineState = {
   employees: Employee[];
   punches: Punch[];

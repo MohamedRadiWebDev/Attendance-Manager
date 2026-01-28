@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { buildApiUrl } from "@/lib/api";
-import { OFFLINE_MODE, getSpecialRules as getOfflineSpecialRules } from "@/lib/offlineStore";
+import { getSpecialRules as getOfflineSpecialRules, isOfflineModeEnabled } from "@/lib/offlineStore";
 import * as XLSX from "xlsx";
 
 const RULE_TYPE_LABELS: Record<string, string> = {
@@ -120,7 +120,7 @@ export default function SpecialCases() {
   };
 
   const handleExport = () => {
-    if (!OFFLINE_MODE) {
+    if (!isOfflineModeEnabled()) {
       window.location.href = buildApiUrl("/api/special-rules/export");
       return;
     }
@@ -157,7 +157,7 @@ export default function SpecialCases() {
   };
 
   const handleDownloadTemplate = () => {
-    if (!OFFLINE_MODE) {
+    if (!isOfflineModeEnabled()) {
       window.location.href = buildApiUrl("/api/templates/special_rules");
       return;
     }

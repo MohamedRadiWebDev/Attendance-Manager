@@ -5,10 +5,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getApiFetch, MOCK_MODE, mockSpecialRules } from "@/lib/mockData";
 import {
-  OFFLINE_MODE,
   addSpecialRules,
   deleteSpecialRule,
+  enableOfflineMode,
   getSpecialRules as getOfflineSpecialRules,
+  isOfflineModeEnabled,
   updateSpecialRule,
 } from "@/lib/offlineStore";
 import * as XLSX from "xlsx";
@@ -18,13 +19,14 @@ export function useSpecialRules() {
     queryKey: [api.specialRules.list.path],
     queryFn: async () => {
       if (MOCK_MODE) return mockSpecialRules;
-      if (OFFLINE_MODE) return getOfflineSpecialRules();
+      if (isOfflineModeEnabled()) return getOfflineSpecialRules();
       const apiFetch = getApiFetch();
       try {
         const res = await apiFetch(api.specialRules.list.path, { credentials: "include" });
         if (!res.ok) throw new Error("فشل جلب القواعد");
         return res.json();
       } catch {
+        enableOfflineMode();
         return getOfflineSpecialRules();
       }
     },
@@ -37,7 +39,7 @@ export function useCreateSpecialRule() {
 
   return useMutation({
     mutationFn: async (data: InsertSpecialRule) => {
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         addSpecialRules([data]);
         return data as unknown as SpecialRule;
       }
@@ -68,7 +70,7 @@ export function useUpdateSpecialRule() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertSpecialRule> }) => {
       const url = buildUrl(api.specialRules.update.path, { id });
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         updateSpecialRule(id, data);
         return { id, ...data } as SpecialRule;
       }
@@ -99,7 +101,7 @@ export function useDeleteSpecialRule() {
   return useMutation({
     mutationFn: async (id: number) => {
       const url = buildUrl(api.specialRules.delete.path, { id });
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         deleteSpecialRule(id);
         return;
       }
@@ -190,7 +192,7 @@ export function useImportSpecialRules() {
         return { success: true, count: rules.length, errors };
       };
 
-      if (OFFLINE_MODE) {
+      if (isOfflineModeEnabled()) {
         return parseOfflineRules();
       }
 
@@ -205,6 +207,7 @@ export function useImportSpecialRules() {
         if (!res.ok) throw new Error("فشل استيراد القواعد");
         return res.json();
       } catch {
+        enableOfflineMode();
         return parseOfflineRules();
       }
     },
