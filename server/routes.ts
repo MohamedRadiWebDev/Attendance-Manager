@@ -4,11 +4,11 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
 import { ruleEngine, type RuleContext, type RuleEffect } from "./ruleEngine";
-import { api } from "@shared/routes";
+import { api } from "../shared/routes";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, parse, isValid, parseISO, differenceInMinutes, addMinutes, addHours, isSaturday, isFriday, addDays } from "date-fns";
-import type { AuditTrace, InsertSpecialRule } from "@shared/schema";
+import type { AuditTrace, InsertSpecialRule } from "../shared/schema";
 
 // Multer for file uploads (memory storage)
 const upload = multer({ storage: multer.memoryStorage() });
