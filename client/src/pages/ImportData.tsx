@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useImportFile } from "@/hooks/use-import";
 import { Upload, FileSpreadsheet, Check, AlertTriangle, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as XLSX from "xlsx";
+import { MOCK_MODE } from "@/lib/mockData";
 
 const columnSpecs = {
   master: {
