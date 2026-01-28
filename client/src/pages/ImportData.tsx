@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useImportFile } from "@/hooks/use-import";
 import { Upload, FileSpreadsheet, Check, AlertTriangle, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { buildApiUrl } from "@/lib/api";
 
 const columnSpecs = {
   master: {
@@ -33,7 +34,7 @@ export default function ImportData() {
   };
 
   const downloadTemplate = (type: string) => {
-    window.open(`/api/templates/${type}`, '_blank');
+    window.open(buildApiUrl(`/api/templates/${type}`), "_blank");
   };
 
   const tabs = [
