@@ -1,16 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
-import { getApiFetch, MOCK_MODE } from "@/lib/mockData";
 
 export function useEmployees() {
   return useQuery({
     queryKey: [api.employees.list.path],
-    queryFn: async () => {
-      const apiFetch = getApiFetch();
-      const res = await apiFetch(api.employees.list.path, { credentials: "include" });
-      if (!res.ok) throw new Error("فشل جلب بيانات الموظفين");
-      const data = await res.json();
-      return MOCK_MODE ? data : api.employees.list.responses[200].parse(data);
-    },
   });
 }
