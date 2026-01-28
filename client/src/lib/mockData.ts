@@ -1,3 +1,5 @@
+import { buildApiUrl } from "@/lib/api";
+
 export const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === "true";
 
 export const mockEmployees: any[] = [];
@@ -41,5 +43,15 @@ export async function mockFetch(url: string, options?: RequestInit): Promise<Res
 }
 
 export function getApiFetch() {
-  return MOCK_MODE ? mockFetch : fetch;
+  if (MOCK_MODE) {
+    return mockFetch;
+  }
+  return (input: RequestInfo | URL, init?: RequestInit) => {
+    if (typeof input === "string") {
+      return fetch(buildApiUrl(input), init);
+    }
+    const url = input instanceof Request ? input.url : input.toString();
+    const request = input instanceof Request ? input : new Request(input);
+    return fetch(new Request(buildApiUrl(url), request), init ?? request);
+  };
 }
