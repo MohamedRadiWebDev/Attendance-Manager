@@ -29,6 +29,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { buildApiUrl } from "@/lib/api";
+import { OFFLINE_MODE, getSpecialRules as getOfflineSpecialRules } from "@/lib/offlineStore";
+import * as XLSX from "xlsx";
 
 const RULE_TYPE_LABELS: Record<string, string> = {
   'CUSTOM_SHIFT': 'وردية مخصصة',
@@ -117,11 +120,114 @@ export default function SpecialCases() {
   };
 
   const handleExport = () => {
-    window.location.href = "/api/special-rules/export";
+    if (!OFFLINE_MODE) {
+      window.location.href = buildApiUrl("/api/special-rules/export");
+      return;
+    }
+
+    const rules = getOfflineSpecialRules();
+    const exportData = rules.map((rule) => ({
+      id: rule.id,
+      name: rule.name,
+      enabled: rule.enabled,
+      priority: rule.priority,
+      scopeType: rule.scopeType,
+      scopeValues: rule.scopeValues?.join(",") || "",
+      dateFrom: rule.dateFrom,
+      dateTo: rule.dateTo,
+      daysOfWeek: rule.daysOfWeek?.join(",") || "",
+      ruleType: rule.ruleType,
+      params_json: JSON.stringify(rule.params || {}),
+      notes: rule.notes || "",
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    XLSX.utils.book_append_sheet(wb, ws, "rules");
+    const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const blob = new Blob([arrayBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "special_rules.xlsx";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleDownloadTemplate = () => {
-    window.location.href = "/api/templates/special_rules";
+    if (!OFFLINE_MODE) {
+      window.location.href = buildApiUrl("/api/templates/special_rules");
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+      [
+        "name",
+        "enabled",
+        "priority",
+        "scopeType",
+        "scopeValues",
+        "dateFrom",
+        "dateTo",
+        "daysOfWeek",
+        "ruleType",
+        "params_json",
+        "notes",
+      ],
+      [
+        "وردية مخصصة - قسم المبيعات",
+        "true",
+        "10",
+        "department",
+        "المبيعات",
+        "2025-01-01",
+        "2025-12-31",
+        "",
+        "CUSTOM_SHIFT",
+        '{"shiftStart":"09:00","shiftEnd":"17:00"}',
+        "",
+      ],
+      [
+        "إعفاء من الخصومات - محمد",
+        "true",
+        "5",
+        "employee",
+        "EMP001",
+        "2025-01-01",
+        "2025-01-31",
+        "",
+        "ATTENDANCE_EXEMPT",
+        '{"countAsPresent":true,"exemptPenalties":true}',
+        "فترة تجريبية",
+      ],
+      [
+        "عمل إضافي ليلي - الأمن",
+        "true",
+        "10",
+        "department",
+        "الأمن",
+        "2025-01-01",
+        "2025-12-31",
+        "",
+        "OVERTIME_OVERNIGHT",
+        '{"allowNextDayCheckout":true,"maxOvernightHours":12}',
+        "",
+      ],
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const blob = new Blob([arrayBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "template_special_rules.xlsx";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
