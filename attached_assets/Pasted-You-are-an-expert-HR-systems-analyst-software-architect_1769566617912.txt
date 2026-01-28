@@ -1,0 +1,170 @@
+You are an expert HR systems analyst + software architect + Excel-to-system reverse engineer.
+
+GOAL
+Build a LOCAL (offline) web application that reproduces an existing Excel-based biometric HR Attendance & Departure + Payroll-prep system EXACTLY (logic + outputs). The web app must match the Excel workbook behavior 1:1 and generate Excel outputs identical in schema.
+
+HARD CONSTRAINTS (NON-NEGOTIABLE)
+- Frontend only: React or Next.js (either acceptable), TypeScript preferred
+- No backend server, no database, no authentication
+- No persistent storage beyond in-memory/session (refresh clears changes)
+- All data is processed in memory only
+- All final outputs are exported as Excel .xlsx files
+- Do NOT invent business logic: if unclear, implement a “Needs Mapping” placeholder and show it in an Audit panel.
+- Output schema must be identical to the provided Excel Template sheet(s): same columns, order, Arabic headers, and cell value types.
+
+UI REQUIREMENTS
+- Arabic UI (RTL)
+- Simple clean HR dashboard (Tailwind or simple CSS)
+- Screens:
+  1) Dashboard (period overview)
+  2) Upload Files
+  3) Daily Attendance Grid (editable)
+  4) Special Cases Management (حالة خاصة)
+  5) Monthly Summary
+  6) Export Excel
+  7) Audit/Trace (explain how each value was computed)
+- Color rules:
+  - Violations in red
+  - Normal attendance in green
+  - Missing data in yellow
+
+INPUT FILES (UPLOAD)
+1) Raw biometric punches Excel (بصمة الحضور):
+   - Contains employee_code + punch_datetime (multiple per day)
+   - punch_datetime can be real Excel datetime OR text datetime like "16/12/2025 12:06 AM"
+2) Master Data / Capacity Excel (الماستر داتا / الكابستي):
+   - employee_code, name, department, section, job, branch
+   - hire_date, termination_date (optional)
+   - shift_start (per employee or default)
+   - any other employee attributes used in the template
+3) Attendance Template Excel (شيت الحضور والانصراف الأساسي):
+   - This defines the required output schema (columns, order, Arabic headers)
+4) Optional adjustment Excels (uploaded manually, not auto-sync):
+   - Missions (ماموريات): employee_code + date + start_time + end_time
+   - Permissions (أذونات): employee_code + date + start_time + end_time
+   - Leaves (اجازات): employee_code + date + leave_type (+ any required fields)
+
+PARSING & NORMALIZATION (CRITICAL)
+- Support Excel datetimes and text datetimes; normalize all punches to:
+  - date = YYYY-MM-DD
+  - time = HH:mm:ss
+- Generate MovementCode = employee_code + date (same as Excel concept)
+- Validate:
+  - unknown employee codes
+  - invalid datetime formats
+  - duplicate punches
+  - overlaps in missions/permissions
+- Show validation errors in a dedicated “Import Validation” panel.
+
+EXCEL LOGIC TO REPLICATE (BASED ON THE WORKBOOK)
+Fingerprint processing:
+- Multiple punches per employee per day
+- Check-in = earliest timestamp
+- Check-out = latest timestamp
+- Middle punches ignored
+
+Daily attendance computation (one row per employee per day):
+- FirstStamp = MIN( check-in, mission_start, permission_start ) ignoring empty/zero
+- LastStamp  = MAX( check-out, mission_end, permission_end ) ignoring empty/zero
+- TotalWorkingHours = LastStamp - FirstStamp
+
+Shift rules (match Excel precedence):
+- ShiftStart comes from master/template values
+- ShiftEnd must match Excel’s rule behavior:
+  - If day is Saturday:
+      - If job == "خدمات معاونة" => +7 hours
+      - Else => +6 hours
+  - Else => +8 hours
+- Do NOT hardcode alternative durations unless explicitly configured.
+- Provide a Shift Rules UI so HR can adjust durations safely (with defaults matching the workbook).
+
+“Excused Not Present” suppressor (must match Excel):
+- If any of these exist, penalties should be suppressed:
+  - leave flags (paid/unpaid/sick)
+  - weekly rest
+  - official holiday
+  - joining period (date before hire)
+  - leaving period (date after termination)
+  - special note meaning attendance not required ("بدون حضور وانصراف")
+- Implement the same precedence: suppress penalties BEFORE computing lateness/early/missing/absence.
+
+Penalty rules (match Excel behavior and thresholds):
+- Late Arrival (التأخيرات):
+  - computed only if NOT suppressed and NOT missing-stamp and NOT “without attendance tracking”
+  - lateness = FirstStamp - ShiftStart
+  - tier table:
+      0–15 min => 0
+      16–30 min => 0.25
+      31–60 min => 0.5
+      61+ min  => 1
+  - If penalty == 0, show blank like Excel (not 0)
+- Early Leave (انصراف بدون اذن):
+  - computed only if NOT suppressed and NOT missing-stamp and NOT “without attendance tracking”
+  - early = ShiftEnd - LastStamp
+  - if early > 5 minutes => 0.5 (else blank)
+- Missing Stamp (عدم بصمة):
+  - if not suppressed AND FirstStamp exists AND LastStamp == FirstStamp => 0.5
+- Absence (غياب بدون اذن):
+  - if not suppressed AND TotalWorkingHours is blank => 1
+  - In summary, absence is multiplied by 2 (absence * 2)
+- Disciplinary penalties (جزاءات تأديبية) are manual inputs (like Excel).
+- Deduction status per day:
+  - If sum of penalties > 0 => "يوجد جزاء" else blank
+- Monthly status:
+  - If any day has "يوجد جزاء" => "يوجد خصم"
+
+Missions & Permissions behavior:
+- Missions/Permissions act as time sources for First/Last stamps.
+- They also have computed duration fields.
+- Permission totals (hours + counts) are aggregated per employee in summary.
+
+Overtime:
+- Candidate overtime windows:
+  - Early OT: if FirstStamp < ShiftStart => ShiftStart - FirstStamp
+  - Late OT:  if LastStamp > ShiftEnd  => LastStamp - ShiftEnd
+- In the workbook, day/night OT fields may be manual; replicate exactly:
+  - keep Day OT and Night OT editable fields
+  - Total OT = Day OT + Night OT
+- Convert OT to days in summary:
+  - OT_days = MIN( (OT_hours * 24) / 8 , 6 )
+- Do NOT subtract OT from deductions unless the Excel template explicitly does so.
+
+SPECIAL CASES (حالة خاصة) – OVERRIDE ENGINE
+- Provide UI to create override rules:
+  - employee + date range + rule type + description
+- Rule types examples:
+  - Attendance exempt (no attendance required)
+  - Custom shift (override shift start/end or duration)
+  - Manual penalty override (set specific penalty values)
+  - Ignore biometric punches for a range
+- Overrides must apply BEFORE penalty calculation (like Excel “بدون حضور وانصراف” effect).
+
+OUTPUT REQUIREMENTS (MUST BE IDENTICAL IN SHAPE)
+Generate two Excel exports:
+1) Attendance & Departure output:
+   - identical columns/order/Arabic headers as the Attendance Template sheet
+   - values must be in correct types (dates as dates, times as times or consistent strings)
+2) Monthly Summary output:
+   - one row per employee
+   - totals must match Excel aggregation logic and blank/zero conventions
+
+AUDIT / TRACE REQUIREMENT (VERY IMPORTANT)
+For every computed field (check-in/out, first/last stamp, penalties, OT, totals):
+- Show: input sources + rule applied + intermediate values (e.g., lateness minutes)
+- Provide a “Diff Mode”:
+  - if user uploads an Excel output from the original workbook, compare cell-by-cell and highlight differences.
+
+DELIVERABLES
+Return:
+- full project structure (folders/files)
+- key UI components
+- in-memory state model
+- Excel parsing (read) + Excel generation (write)
+- rule engine implementation (pure functions)
+- instructions to run locally (npm install, npm run dev/build)
+- include sample mock data and unit tests for penalty rules + edge cases
+
+IMPORTANT
+- Keep the implementation deterministic and testable.
+- Never depend on sorting tricks (VLOOKUP ASC/DESC); compute min/max punches directly.
+- If a rule is unclear, don’t guess: surface it in Audit panel as “Needs Mapping”.
