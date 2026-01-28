@@ -1,0 +1,115 @@
+────────────────────────────────────────
+1) SPECIAL CASES (RULE ENGINE)
+────────────────────────────────────────
+Implement a generic Special Rules engine that is evaluated BEFORE daily calculations.
+
+Each Special Rule has:
+- id, name, enabled
+- scopeType: employee | department | branch | all
+- scopeValues: list of employee codes / ids
+- dateFrom, dateTo
+- daysOfWeek (optional)
+- ruleType
+- params (JSON object)
+- priority (higher wins)
+- notes
+
+Supported rule types:
+1) CUSTOM_SHIFT
+   - params: shiftStart, shiftEnd OR durationMinutes
+   - may allow overnight shift
+2) ATTENDANCE_EXEMPT
+   - params: countAsPresent (true/false), exemptPenalties (true)
+3) PENALTY_OVERRIDE
+   - params: latePenalty, earlyPenalty, absencePenalty (number or "IGNORE")
+4) IGNORE_BIOMETRIC
+   - params: true
+5) OVERTIME_OVERNIGHT
+   - params:
+     - allowNextDayCheckout: true
+     - maxOvernightHours (e.g. 24)
+
+Rule precedence:
+- Rules apply before attendance/penalty calculation
+- Multiple rules are resolved by priority
+- All applied rules must appear in an Audit/Trace view
+
+────────────────────────────────────────
+2) OVERNIGHT / FULL-DAY STAY OVERTIME
+────────────────────────────────────────
+Support cases where an employee stays overnight:
+
+- When OVERTIME_OVERNIGHT rule is active:
+  - Allow linking the next day’s first punch as the check-out for the previous day
+  - Calculate overtime from ShiftEnd (day 1) → linked checkout (day 2)
+  - Enforce maxOvernightHours to prevent abuse
+  - Do NOT double-count attendance between two days
+- Overnight logic must be auditable and optional per employee/date range
+
+────────────────────────────────────────
+3) IMPORT / EXPORT SPECIAL CASES
+────────────────────────────────────────
+Support bulk upload and download of Special Rules via Excel.
+
+Template: special_rules.xlsx (sheet: rules)
+Columns:
+- id
+- name
+- enabled
+- priority
+- scopeType
+- scopeValues (comma-separated)
+- dateFrom
+- dateTo
+- daysOfWeek
+- ruleType
+- params_json
+- notes
+
+Features:
+- Upload with preview + validation
+- Reject invalid ruleType / malformed JSON
+- Export current rules in same template format
+
+────────────────────────────────────────
+4) SEARCH FIX (CRITICAL)
+────────────────────────────────────────
+Fix all search functionality across attendance and summary screens.
+
+Requirements:
+- Normalize employee codes (string-based, trim, unify digits)
+- Normalize Arabic text (remove tashkeel, unify أ/إ/آ → ا)
+- Search across:
+  - employee code
+  - name
+  - department
+  - section
+  - branch
+- Use a precomputed searchIndex per row
+- Debounced search (≈200ms)
+- Filter from original dataset (not already-filtered rows)
+
+────────────────────────────────────────
+5) AUDIT / TRACE (MANDATORY)
+────────────────────────────────────────
+For each daily attendance row, provide an Audit view showing:
+- Raw punches used
+- Applied missions / permissions / leaves
+- Special Rules applied (with priority)
+- Shift used
+- FirstStamp / LastStamp source
+- Penalties computed or suppressed (with reason)
+- Overtime calculation details
+
+────────────────────────────────────────
+DELIVERABLES
+- Updated rule engine implementation
+- UI for managing Special Cases (CRUD + import/export)
+- Overnight overtime handling
+- Fixed and reliable search
+- Audit/Trace panel
+- Updated Excel exports (attendance + summary unchanged in schema)
+
+IMPORTANT
+- Do not refactor core attendance logic; wrap it with rules
+- If behavior is ambiguous, surface it clearly in Audit as “Needs Rule Mapping”

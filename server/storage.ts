@@ -3,7 +3,7 @@ import {
   type Employee, type InsertEmployee,
   type Punch, type InsertPunch,
   type DailyAttendance,
-  type SpecialCase, type InsertSpecialCase,
+  type SpecialRule, type InsertSpecialRule,
   type Mission, type InsertMission,
   type Permission, type InsertPermission,
   type Leave, type InsertLeave
@@ -34,10 +34,13 @@ export interface IStorage {
   addLeaves(leaves: InsertLeave[]): Promise<void>;
   getLeaves(employeeCode: string, date: string): Promise<Leave[]>;
   
-  // Special Cases
-  getSpecialCases(): Promise<SpecialCase[]>;
-  addSpecialCase(rule: InsertSpecialCase): Promise<SpecialCase>;
-  deleteSpecialCase(id: number): Promise<void>;
+  // Special Rules
+  getSpecialRules(): Promise<SpecialRule[]>;
+  getSpecialRule(id: number): Promise<SpecialRule | undefined>;
+  addSpecialRule(rule: InsertSpecialRule): Promise<SpecialRule>;
+  updateSpecialRule(id: number, rule: Partial<InsertSpecialRule>): Promise<SpecialRule | undefined>;
+  deleteSpecialRule(id: number): Promise<void>;
+  addSpecialRules(rules: InsertSpecialRule[]): Promise<void>;
 
   // Utility
   clearAll(): Promise<void>;
@@ -50,7 +53,7 @@ export class MemStorage implements IStorage {
   private missions: Mission[] = [];
   private permissions: Permission[] = [];
   private leaves: Leave[] = [];
-  private specialCases: SpecialCase[] = [];
+  private specialRules: SpecialRule[] = [];
   
   private idCounter = {
     emp: 1,
@@ -148,18 +151,44 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async getSpecialCases(): Promise<SpecialCase[]> {
-    return this.specialCases;
+  async getSpecialRules(): Promise<SpecialRule[]> {
+    return this.specialRules;
   }
 
-  async addSpecialCase(rule: InsertSpecialCase): Promise<SpecialCase> {
-    const sc = { ...rule, id: this.idCounter.sc++ };
-    this.specialCases.push(sc);
-    return sc;
+  async getSpecialRule(id: number): Promise<SpecialRule | undefined> {
+    return this.specialRules.find(r => r.id === id);
   }
 
-  async deleteSpecialCase(id: number): Promise<void> {
-    this.specialCases = this.specialCases.filter(s => s.id !== id);
+  async addSpecialRule(rule: InsertSpecialRule): Promise<SpecialRule> {
+    const sr: SpecialRule = { 
+      ...rule, 
+      id: this.idCounter.sc++,
+      enabled: rule.enabled ?? true,
+      priority: rule.priority ?? 0,
+      scopeValues: rule.scopeValues ?? null,
+      daysOfWeek: rule.daysOfWeek ?? null,
+      params: rule.params ?? null,
+      notes: rule.notes ?? null
+    };
+    this.specialRules.push(sr);
+    return sr;
+  }
+
+  async updateSpecialRule(id: number, updates: Partial<InsertSpecialRule>): Promise<SpecialRule | undefined> {
+    const idx = this.specialRules.findIndex(r => r.id === id);
+    if (idx === -1) return undefined;
+    this.specialRules[idx] = { ...this.specialRules[idx], ...updates };
+    return this.specialRules[idx];
+  }
+
+  async deleteSpecialRule(id: number): Promise<void> {
+    this.specialRules = this.specialRules.filter(s => s.id !== id);
+  }
+
+  async addSpecialRules(rules: InsertSpecialRule[]): Promise<void> {
+    for (const rule of rules) {
+      await this.addSpecialRule(rule);
+    }
   }
 
   async clearAll(): Promise<void> {
@@ -169,7 +198,7 @@ export class MemStorage implements IStorage {
     this.missions = [];
     this.permissions = [];
     this.leaves = [];
-    this.specialCases = [];
+    this.specialRules = [];
   }
 }
 

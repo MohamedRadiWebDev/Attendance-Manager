@@ -57,15 +57,33 @@ export const leaves = pgTable("leaves", {
   details: text("details"),
 });
 
-// === SPECIAL CASES ===
-export const specialCases = pgTable("special_cases", {
+// === SPECIAL RULES (Rule Engine) ===
+export const specialRules = pgTable("special_rules", {
   id: serial("id").primaryKey(),
-  employeeCode: text("employee_code").notNull(),
-  startDate: text("start_date").notNull(),
-  endDate: text("end_date").notNull(),
-  ruleType: text("rule_type").notNull(), // Exempt, CustomShift, etc.
-  parameters: jsonb("parameters"), // e.g. { newShiftStart: "09:00" }
+  name: text("name").notNull(),
+  enabled: boolean("enabled").default(true),
+  priority: integer("priority").default(0), // Higher wins
+  
+  // Scope
+  scopeType: text("scope_type").notNull(), // employee | department | branch | all
+  scopeValues: text("scope_values").array(), // List of codes/ids
+  
+  // Date Range
+  dateFrom: text("date_from").notNull(), // YYYY-MM-DD
+  dateTo: text("date_to").notNull(),     // YYYY-MM-DD
+  daysOfWeek: integer("days_of_week").array(), // 0=Sun, 1=Mon, etc.
+  
+  // Rule Type: CUSTOM_SHIFT | ATTENDANCE_EXEMPT | PENALTY_OVERRIDE | IGNORE_BIOMETRIC | OVERTIME_OVERNIGHT
+  ruleType: text("rule_type").notNull(),
+  
+  // Parameters JSON
+  params: jsonb("params"), // Type-specific params
+  
+  notes: text("notes"),
 });
+
+// Legacy alias for backwards compatibility
+export const specialCases = specialRules;
 
 // === DAILY ATTENDANCE (Computed) ===
 // This is the main output record
@@ -116,7 +134,8 @@ export const insertPunchSchema = createInsertSchema(punches).omit({ id: true });
 export const insertMissionSchema = createInsertSchema(missions).omit({ id: true });
 export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true });
 export const insertLeaveSchema = createInsertSchema(leaves).omit({ id: true });
-export const insertSpecialCaseSchema = createInsertSchema(specialCases).omit({ id: true });
+export const insertSpecialRuleSchema = createInsertSchema(specialRules).omit({ id: true });
+export const insertSpecialCaseSchema = insertSpecialRuleSchema; // Legacy alias
 export const insertDailyAttendanceSchema = createInsertSchema(dailyAttendance).omit({ id: true });
 
 export type Employee = typeof employees.$inferSelect;
@@ -134,21 +153,52 @@ export type InsertPermission = z.infer<typeof insertPermissionSchema>;
 export type Leave = typeof leaves.$inferSelect;
 export type InsertLeave = z.infer<typeof insertLeaveSchema>;
 
-export type SpecialCase = typeof specialCases.$inferSelect;
-export type InsertSpecialCase = z.infer<typeof insertSpecialCaseSchema>;
+export type SpecialRule = typeof specialRules.$inferSelect;
+export type InsertSpecialRule = z.infer<typeof insertSpecialRuleSchema>;
+export type SpecialCase = SpecialRule; // Legacy alias
+export type InsertSpecialCase = InsertSpecialRule;
 
 export type DailyAttendance = typeof dailyAttendance.$inferSelect;
 
 // === API DTOs ===
 export type MonthlySummary = {
-  employeeCode: text;
-  name: text;
-  department: text;
-  job: text;
+  employeeCode: string;
+  name: string;
+  department: string;
+  job: string;
   absenceDays: number;
   lateMinutes: number;
   penaltyDays: number;
   overtimeHours: number;
   overtimeDays: number;
-  totalDeductions: number; // "يوجد خصم" flag equivalent
+  totalDeductions: number;
 };
+
+// === AUDIT TRACE ===
+export type AuditTrace = {
+  rawPunches: string[];
+  appliedMissions: string[];
+  appliedPermissions: string[];
+  appliedLeaves: string[];
+  appliedRules: { ruleId: number; ruleName: string; ruleType: string; priority: number }[];
+  shiftUsed: { start: string; end: string };
+  firstStampSource: string;
+  lastStampSource: string;
+  penalties: { type: string; value: number; reason: string; suppressed: boolean }[];
+  overtimeDetails: { type: string; minutes: number; reason: string }[];
+  notes: string[];
+};
+
+// Rule Types
+export const RULE_TYPES = [
+  'CUSTOM_SHIFT',
+  'ATTENDANCE_EXEMPT', 
+  'PENALTY_OVERRIDE',
+  'IGNORE_BIOMETRIC',
+  'OVERTIME_OVERNIGHT'
+] as const;
+
+export type RuleType = typeof RULE_TYPES[number];
+
+export const SCOPE_TYPES = ['employee', 'department', 'branch', 'all'] as const;
+export type ScopeType = typeof SCOPE_TYPES[number];
