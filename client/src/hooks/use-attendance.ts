@@ -38,9 +38,7 @@ export function useCalculateAttendance() {
 export function useExportAttendance() {
   return useMutation({
     mutationFn: async () => {
-      const data = await localStore.getDailyAttendance();
-      const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-      return blob;
+      return await localStore.getDailyAttendance();
     },
   });
 }
@@ -48,9 +46,20 @@ export function useExportAttendance() {
 export function useExportSummary() {
   return useMutation({
     mutationFn: async () => {
-      const data = await localStore.getDailyAttendance();
-      const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-      return blob;
+      const attendance = await localStore.getDailyAttendance();
+      const employees = await localStore.getEmployees();
+      
+      // Basic summary logic
+      return employees.map(emp => {
+        const empAtt = attendance.filter(a => a.employeeCode === emp.code);
+        return {
+          "كود الموظف": emp.code,
+          "الاسم": emp.name,
+          "أيام الغياب": empAtt.filter(a => a.isAbsent).length,
+          "إجمالي التأخير": empAtt.reduce((sum, a) => sum + (a.latePenalty || 0), 0),
+          "إجمالي الإضافي": empAtt.reduce((sum, a) => sum + (a.totalOvertime || 0), 0),
+        };
+      });
     },
   });
 }

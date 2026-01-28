@@ -37,6 +37,26 @@ export function useImportFile() {
           })).filter(p => p.employeeCode && p.timestamp);
           
           await localStore.addPunches(punches as any[]);
+        } else if (type === "missions") {
+          const missions = rows.map(row => ({
+            employeeCode: String(row.employeeCode || row.code || row.الكود || "").trim(),
+            date: String(row.date || row.التاريخ || ""),
+            startTime: String(row.startTime || row["وقت البداية"] || ""),
+            endTime: String(row.endTime || row["وقت النهاية"] || ""),
+            description: String(row.description || row.الوصف || ""),
+          })).filter(m => m.employeeCode && m.date);
+          
+          await localStore.addMissions(missions as any[]);
+        } else if (type === "leaves") {
+          const leaves = rows.map(row => ({
+            employeeCode: String(row.employeeCode || row.code || row.الكود || "").trim(),
+            startDate: String(row.startDate || row["تاريخ البداية"] || ""),
+            endDate: String(row.endDate || row["تاريخ النهاية"] || ""),
+            type: String(row.type || row["نوع الاجازة"] || ""),
+            details: String(row.details || row.ملاحظات || ""),
+          })).filter(l => l.employeeCode && l.startDate);
+          
+          await localStore.addLeaves(leaves as any[]);
         } else if (type === "attendance") {
           const records = rows.map(row => ({
             employeeCode: String(row.employeeCode || row.code || row.الكود || "").trim(),
