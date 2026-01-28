@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import { getApiFetch, MOCK_MODE } from "@/lib/mockData";
 
 type ImportType = 'punches' | 'master' | 'missions' | 'leaves';
 
@@ -13,7 +14,8 @@ export function useImportFile() {
       formData.append("file", file);
 
       const url = buildUrl(api.import.upload.path, { type });
-      const res = await fetch(url, {
+      const apiFetch = getApiFetch();
+      const res = await apiFetch(url, {
         method: api.import.upload.method,
         body: formData,
         credentials: "include",
@@ -22,7 +24,8 @@ export function useImportFile() {
       if (!res.ok) {
         throw new Error("فشل رفع الملف");
       }
-      return api.import.upload.responses[200].parse(await res.json());
+      const data = await res.json();
+      return MOCK_MODE ? data : api.import.upload.responses[200].parse(data);
     },
     onSuccess: (data) => {
       if (data.count === 0) {

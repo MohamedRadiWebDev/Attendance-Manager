@@ -10,7 +10,8 @@ export function useSpecialRules() {
     queryKey: [api.specialRules.list.path],
     queryFn: async () => {
       if (MOCK_MODE) return mockSpecialRules;
-      const res = await fetch(api.specialRules.list.path, { credentials: "include" });
+      const apiFetch = getApiFetch();
+      const res = await apiFetch(api.specialRules.list.path, { credentials: "include" });
       if (!res.ok) throw new Error("فشل جلب القواعد");
       return res.json();
     },
@@ -98,7 +99,8 @@ export function useImportSpecialRules() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(api.specialRules.import.path, {
+      const apiFetch = getApiFetch();
+      const res = await apiFetch(api.specialRules.import.path, {
         method: api.specialRules.import.method,
         body: formData,
         credentials: "include",

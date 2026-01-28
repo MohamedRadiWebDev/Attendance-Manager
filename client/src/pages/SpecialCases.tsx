@@ -29,6 +29,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { buildApiUrl } from "@/lib/api";
 
 const RULE_TYPE_LABELS: Record<string, string> = {
   'CUSTOM_SHIFT': 'وردية مخصصة',
@@ -117,11 +118,11 @@ export default function SpecialCases() {
   };
 
   const handleExport = () => {
-    window.location.href = "/api/special-rules/export";
+    window.location.href = buildApiUrl("/api/special-rules/export");
   };
 
   const handleDownloadTemplate = () => {
-    window.location.href = "/api/templates/special_rules";
+    window.location.href = buildApiUrl("/api/templates/special_rules");
   };
 
   return (
