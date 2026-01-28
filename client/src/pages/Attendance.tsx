@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useAttendance, useCalculateAttendance } from "@/hooks/use-attendance";
 import { useEmployees } from "@/hooks/use-employees";
+import { normalizeArabic, buildSearchIndex, matchesSearch } from "@/lib/arabicSearch";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { 
@@ -11,49 +12,112 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Briefcase
+  Briefcase,
+  Info,
+  X,
+  ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+
+type AuditTrace = {
+  rawPunches: string[];
+  appliedMissions: string[];
+  appliedPermissions: string[];
+  appliedLeaves: string[];
+  appliedRules: { ruleId: number; ruleName: string; ruleType: string; priority: number }[];
+  shiftUsed: { start: string; end: string };
+  firstStampSource: string;
+  lastStampSource: string;
+  penalties: { type: string; value: number; reason: string; suppressed: boolean }[];
+  overtimeDetails: { type: string; minutes: number; reason: string }[];
+  notes: string[];
+};
+
+function parseAudit(logs: string[] | null): AuditTrace | null {
+  if (!logs) return null;
+  const auditLog = logs.find(l => l.startsWith("Audit:"));
+  if (!auditLog) return null;
+  try {
+    return JSON.parse(auditLog.replace("Audit: ", ""));
+  } catch {
+    return null;
+  }
+}
 
 export default function Attendance() {
   const [search, setSearch] = useState("");
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const { data: attendance, isLoading } = useAttendance();
   const { data: employees } = useEmployees();
   const { mutate: calculate, isPending: isCalculating } = useCalculateAttendance();
 
-  // Helper to get employee name from code
-  const getEmployeeName = (code: string) => {
-    return employees?.find(e => e.code === code)?.name || code;
-  };
+  const employeeMap = useMemo(() => {
+    const map = new Map<string, { name: string; department: string; branch: string }>();
+    employees?.forEach(e => {
+      map.set(e.code, { name: e.name, department: e.department || "", branch: e.branch || "" });
+    });
+    return map;
+  }, [employees]);
 
-  // Filter data based on search
-  const filteredData = attendance?.filter(record => 
-    record.employeeCode.includes(search) || 
-    getEmployeeName(record.employeeCode).includes(search)
-  ) || [];
+  const getEmployeeInfo = useCallback((code: string) => {
+    return employeeMap.get(code) || { name: code, department: "", branch: "" };
+  }, [employeeMap]);
+
+  const filteredData = useMemo(() => {
+    if (!attendance) return [];
+    if (!search) return attendance;
+
+    const normalizedSearch = normalizeArabic(search);
+    
+    return attendance.filter(record => {
+      const emp = getEmployeeInfo(record.employeeCode);
+      const searchIndex = buildSearchIndex([
+        record.employeeCode,
+        emp.name,
+        emp.department,
+        emp.branch,
+        record.date
+      ]);
+      return searchIndex.includes(normalizedSearch);
+    });
+  }, [attendance, search, getEmployeeInfo]);
 
   const getStatusBadge = (record: any) => {
     if (record.isAbsent) return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800">
         <XCircle className="w-3 h-3" /> غياب
       </span>
     );
+    if (record.isLeave) return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800">
+        إجازة
+      </span>
+    );
     if (record.isMission) return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
         <Briefcase className="w-3 h-3" /> مأمورية
       </span>
     );
     if (record.totalDeduction && record.totalDeduction > 0) return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800">
         <Clock className="w-3 h-3" /> جزاء/تأخير
       </span>
     );
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800">
         <CheckCircle2 className="w-3 h-3" /> حضور
       </span>
     );
   };
+
+  const audit = selectedRecord ? parseAudit(selectedRecord.logs) : null;
 
   return (
     <div className="space-y-8 h-full flex flex-col animate-in fade-in duration-500">
@@ -64,34 +128,41 @@ export default function Attendance() {
         </div>
         
         <div className="flex gap-3">
-          <button
+          <Button
             onClick={() => calculate()}
             disabled={isCalculating}
-            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium shadow-lg hover:shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50"
+            data-testid="button-calculate"
           >
-            {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {isCalculating ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <RefreshCw className="w-4 h-4 ml-2" />}
             احتساب الحضور
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Toolbar */}
       <div className="bg-card p-4 rounded-xl border border-border flex items-center gap-4 shadow-sm">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="بحث باسم الموظف أو الكود..."
+            placeholder="بحث بالاسم، الكود، القسم، أو الفرع..."
             className="w-full bg-background border border-border rounded-lg pl-4 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            data-testid="input-search"
           />
+          {search && (
+            <button 
+              onClick={() => setSearch("")}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
-        <button className="p-2 hover:bg-muted rounded-lg border border-transparent hover:border-border transition-all">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-        </button>
+        <div className="text-sm text-muted-foreground">
+          {filteredData.length} سجل
+        </div>
       </div>
 
-      {/* Data Grid */}
       <div className="flex-1 bg-card rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-right">
@@ -99,73 +170,245 @@ export default function Attendance() {
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">التاريخ</th>
                 <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">الموظف</th>
+                <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">الوردية</th>
                 <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">دخول</th>
                 <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">خروج</th>
                 <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">الحالة</th>
                 <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">الخصم</th>
                 <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">الإضافي</th>
+                <th className="px-6 py-4 text-sm font-semibold text-muted-foreground font-cairo">تفاصيل</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-20">
+                  <td colSpan={9} className="text-center py-20">
                     <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
                     <p className="mt-2 text-muted-foreground">جاري تحميل البيانات...</p>
                   </td>
                 </tr>
               ) : filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-20 text-muted-foreground">
+                  <td colSpan={9} className="text-center py-20 text-muted-foreground">
                     لا توجد سجلات مطابقة
                   </td>
                 </tr>
               ) : (
-                filteredData.map((record) => (
-                  <tr key={record.id} className="group hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium">
-                      {format(new Date(record.date), 'dd MMMM yyyy', { locale: ar })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-foreground">
-                          {getEmployeeName(record.employeeCode)}
-                        </span>
-                        <span className="text-xs text-muted-foreground font-mono">
-                          {record.employeeCode}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-mono text-muted-foreground">
-                      {record.firstPunch || '--:--'}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-mono text-muted-foreground">
-                      {record.lastPunch || '--:--'}
-                    </td>
-                    <td className="px-6 py-4">
-                      {getStatusBadge(record)}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {record.totalDeduction ? (
-                        <span className="text-rose-600 font-bold">
-                          {record.totalDeduction} يوم
-                        </span>
-                      ) : '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                       {record.totalOvertime ? (
-                        <span className="text-emerald-600 font-bold">
-                          {record.totalOvertime} س
-                        </span>
-                      ) : '-'}
-                    </td>
-                  </tr>
-                ))
+                filteredData.map((record) => {
+                  const emp = getEmployeeInfo(record.employeeCode);
+                  return (
+                    <tr key={record.id} className="group hover:bg-muted/30 transition-colors" data-testid={`row-attendance-${record.id}`}>
+                      <td className="px-6 py-4 text-sm font-medium">
+                        {format(new Date(record.date), 'dd MMMM yyyy', { locale: ar })}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-foreground">
+                            {emp.name}
+                          </span>
+                          <span className="text-xs text-muted-foreground font-mono">
+                            {record.employeeCode}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">
+                        {record.shiftStart} - {record.shiftEnd}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-mono text-muted-foreground">
+                        {record.firstPunch || '--:--'}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-mono text-muted-foreground">
+                        {record.lastPunch || '--:--'}
+                      </td>
+                      <td className="px-6 py-4">
+                        {getStatusBadge(record)}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        {record.totalDeduction ? (
+                          <span className="text-rose-600 dark:text-rose-400 font-bold">
+                            {record.totalDeduction} يوم
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                         {record.totalOvertime ? (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                            {Number(record.totalOvertime).toFixed(1)} س
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setSelectedRecord(record)}
+                          data-testid={`button-audit-${record.id}`}
+                        >
+                          <Info className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      <Dialog open={!!selectedRecord} onOpenChange={() => setSelectedRecord(null)}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-cairo text-right flex items-center gap-2">
+              <Info className="w-5 h-5" />
+              تفاصيل التدقيق
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedRecord && (
+            <div className="space-y-4 pt-4 text-right">
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">الموظف:</span>
+                    <span className="font-bold mr-2">{getEmployeeInfo(selectedRecord.employeeCode).name}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">التاريخ:</span>
+                    <span className="font-bold mr-2">{format(new Date(selectedRecord.date), 'dd MMMM yyyy', { locale: ar })}</span>
+                  </div>
+                </div>
+              </div>
+
+              {audit && (
+                <>
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-sm flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      البصمات الأصلية
+                    </h4>
+                    <div className="bg-card p-3 rounded-lg border border-border text-sm font-mono">
+                      {audit.rawPunches.length > 0 ? (
+                        audit.rawPunches.map((p, i) => (
+                          <div key={i}>{p}</div>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">لا توجد بصمات</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-sm">الوردية المستخدمة</h4>
+                    <div className="bg-card p-3 rounded-lg border border-border text-sm">
+                      {audit.shiftUsed.start} - {audit.shiftUsed.end}
+                      <span className="text-muted-foreground mr-2">
+                        (الدخول من: {audit.firstStampSource === 'biometric' ? 'البصمة' : 'مأمورية'}, 
+                        الخروج من: {audit.lastStampSource === 'biometric' ? 'البصمة' : 'مأمورية'})
+                      </span>
+                    </div>
+                  </div>
+
+                  {audit.appliedRules.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-sm">القواعد المطبقة</h4>
+                      <div className="space-y-1">
+                        {audit.appliedRules.map((rule, i) => (
+                          <div key={i} className="bg-primary/10 text-primary p-2 rounded text-sm flex justify-between">
+                            <span>{rule.ruleName}</span>
+                            <span className="text-xs opacity-70">أولوية: {rule.priority}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {audit.appliedMissions.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-sm">المأموريات</h4>
+                      <div className="space-y-1">
+                        {audit.appliedMissions.map((m, i) => (
+                          <div key={i} className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 p-2 rounded text-sm">
+                            {m}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {audit.appliedLeaves.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-sm">الإجازات</h4>
+                      <div className="space-y-1">
+                        {audit.appliedLeaves.map((l, i) => (
+                          <div key={i} className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 p-2 rounded text-sm">
+                            {l}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {audit.penalties.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-sm">الخصومات</h4>
+                      <div className="space-y-1">
+                        {audit.penalties.map((p, i) => (
+                          <div key={i} className={cn(
+                            "p-2 rounded text-sm flex justify-between",
+                            p.suppressed 
+                              ? "bg-muted text-muted-foreground line-through" 
+                              : "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
+                          )}>
+                            <span>{p.reason}</span>
+                            <span className="font-bold">{p.value} يوم</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {audit.overtimeDetails.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-sm">العمل الإضافي</h4>
+                      <div className="space-y-1">
+                        {audit.overtimeDetails.map((o, i) => (
+                          <div key={i} className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 p-2 rounded text-sm flex justify-between">
+                            <span>{o.reason}</span>
+                            <span className="font-bold">{Math.round(o.minutes)} دقيقة</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {audit.notes.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-sm">ملاحظات</h4>
+                      <div className="bg-amber-100 dark:bg-amber-900/30 p-3 rounded-lg text-sm">
+                        {audit.notes.map((n, i) => (
+                          <div key={i}>{n}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!audit && selectedRecord.logs && (
+                <div className="space-y-2">
+                  <h4 className="font-bold text-sm">سجل المعالجة</h4>
+                  <div className="bg-card p-3 rounded-lg border border-border text-sm space-y-1">
+                    {selectedRecord.logs.filter((l: string) => !l.startsWith("Audit:")).map((log: string, i: number) => (
+                      <div key={i} className="text-muted-foreground">{log}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

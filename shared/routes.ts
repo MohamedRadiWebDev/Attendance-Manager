@@ -6,9 +6,12 @@ import {
   insertMissionSchema, 
   insertPermissionSchema, 
   insertLeaveSchema, 
-  insertSpecialCaseSchema,
+  insertSpecialRuleSchema,
   dailyAttendance,
-  employees
+  employees,
+  specialRules,
+  RULE_TYPES,
+  SCOPE_TYPES
 } from "./schema";
 
 export const errorSchemas = {
@@ -87,27 +90,62 @@ export const api = {
     }
   },
 
-  specialCases: {
+  specialRules: {
     list: {
       method: "GET" as const,
-      path: "/api/special-cases",
+      path: "/api/special-rules",
       responses: {
-        200: z.array(insertSpecialCaseSchema),
+        200: z.array(z.custom<typeof specialRules.$inferSelect>()),
+      }
+    },
+    get: {
+      method: "GET" as const,
+      path: "/api/special-rules/:id",
+      responses: {
+        200: z.custom<typeof specialRules.$inferSelect>(),
+        404: errorSchemas.notFound,
       }
     },
     create: {
       method: "POST" as const,
-      path: "/api/special-cases",
-      input: insertSpecialCaseSchema,
+      path: "/api/special-rules",
+      input: insertSpecialRuleSchema,
       responses: {
-        201: z.custom<typeof insertSpecialCaseSchema>(),
+        200: z.custom<typeof specialRules.$inferSelect>(),
+      }
+    },
+    update: {
+      method: "PUT" as const,
+      path: "/api/special-rules/:id",
+      input: insertSpecialRuleSchema.partial(),
+      responses: {
+        200: z.custom<typeof specialRules.$inferSelect>(),
+        404: errorSchemas.notFound,
       }
     },
     delete: {
       method: "DELETE" as const,
-      path: "/api/special-cases/:id",
+      path: "/api/special-rules/:id",
       responses: {
-        204: z.void(),
+        200: z.object({ success: z.boolean() }),
+      }
+    },
+    import: {
+      method: "POST" as const,
+      path: "/api/special-rules/import",
+      responses: {
+        200: z.object({ 
+          success: z.boolean(), 
+          count: z.number(), 
+          errors: z.array(z.string()) 
+        }),
+      }
+    },
+    export: {
+      method: "GET" as const,
+      path: "/api/special-rules/export",
+      responses: {
+        200: z.any(),
       }
     }
   },
