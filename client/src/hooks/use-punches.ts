@@ -7,7 +7,8 @@ export function usePunches() {
   return useQuery({
     queryKey: [api.punches.list.path],
     queryFn: async () => {
-      return (await localStore.getAllPunches()) as Punch[];
+      const data = await localStore.getAllPunches();
+      return data as Punch[];
     },
   });
 }

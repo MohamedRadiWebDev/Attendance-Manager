@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { type Employee } from "@shared/schema";
 
 type AuditTrace = {
   rawPunches: string[];
@@ -60,7 +61,7 @@ export default function Attendance() {
   const attendance = (attendanceQuery.data as any[]) || [];
   const isLoading = attendanceQuery.isLoading;
   const employeesQuery = useEmployees();
-  const employees = (employeesQuery.data as any) || [];
+  const employees = (employeesQuery.data as any[]) || [];
   const calculateMutation = useCalculateAttendance();
   const isCalculating = calculateMutation.isPending;
   const calculate = () => calculateMutation.mutate();

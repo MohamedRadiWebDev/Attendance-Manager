@@ -4,7 +4,7 @@ import { api } from "@shared/routes";
 import { type Employee } from "@shared/schema";
 
 export function useEmployees() {
-  return useQuery<Employee[]>({
+  return useQuery({
     queryKey: [api.employees.list.path],
     queryFn: () => localStore.getEmployees(),
   });
