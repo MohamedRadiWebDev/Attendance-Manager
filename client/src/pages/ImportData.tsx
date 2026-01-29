@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useImportFile } from "@/hooks/use-import";
 import { Upload, FileSpreadsheet, Check, AlertTriangle, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import * as XLSX from "xlsx";
 
 const columnSpecs = {
   master: {
@@ -34,51 +33,7 @@ export default function ImportData() {
   };
 
   const downloadTemplate = (type: string) => {
-    const wb = XLSX.utils.book_new();
-    let ws = XLSX.utils.aoa_to_sheet([[]]);
-    let filename = "template.xlsx";
-
-    if (type === "master") {
-      ws = XLSX.utils.aoa_to_sheet([
-        ["كود", "الاسم", "القسم", "الوظيفة", "الفرع", "تاريخ_التعيين", "بداية_الوردية", "نهاية_الوردية"],
-        ["EMP001", "أحمد محمد", "الحسابات", "محاسب", "القاهرة", "2020-01-15", "08:00", "16:00"],
-        ["EMP002", "محمد علي", "الموارد البشرية", "خدمات معاونة", "الجيزة", "2019-05-20", "08:00", "16:00"],
-      ]);
-      filename = "template_master_data.xlsx";
-    } else if (type === "punches") {
-      ws = XLSX.utils.aoa_to_sheet([
-        ["كود", "التاريخ_والوقت"],
-        ["EMP001", "2025-12-15 08:05:00"],
-        ["EMP001", "2025-12-15 16:30:00"],
-        ["EMP002", "2025-12-15 08:15:00"],
-        ["EMP002", "2025-12-15 15:45:00"],
-      ]);
-      filename = "template_punches.xlsx";
-    } else if (type === "missions") {
-      ws = XLSX.utils.aoa_to_sheet([
-        ["كود", "التاريخ", "وقت_البداية", "وقت_النهاية", "الوصف"],
-        ["EMP001", "2025-12-16", "09:00", "14:00", "مأمورية خارجية"],
-      ]);
-      filename = "template_missions.xlsx";
-    } else if (type === "leaves") {
-      ws = XLSX.utils.aoa_to_sheet([
-        ["كود", "تاريخ_البداية", "تاريخ_النهاية", "نوع_الاجازة", "ملاحظات"],
-        ["EMP001", "2025-12-20", "2025-12-22", "اجازة عارضة", ""],
-      ]);
-      filename = "template_leaves.xlsx";
-    }
-
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-    const blob = new Blob([arrayBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+    window.open(`/api/templates/${type}`, '_blank');
   };
 
   const tabs = [
@@ -94,7 +49,7 @@ export default function ImportData() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-bold font-cairo text-foreground">استيراد البيانات</h1>
-        <p className="text-muted-foreground mt-2">رفع ملفات Excel الخاصة بالنظام (وضع الأوفلاين).</p>
+        <p className="text-muted-foreground mt-2">رفع ملفات Excel الخاصة بالنظام.</p>
       </div>
 
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -169,6 +124,16 @@ export default function ImportData() {
                       <>لم يتم استيراد أي سجلات - تحقق من أسماء الأعمدة</>
                     )}
                   </p>
+                  {lastResult.errors && lastResult.errors.length > 0 && (
+                    <ul className="mt-2 text-sm text-red-600 dark:text-red-400 space-y-1">
+                      {lastResult.errors.slice(0, 5).map((err: string, i: number) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                      {lastResult.errors.length > 5 && (
+                        <li>... و {lastResult.errors.length - 5} أخطاء أخرى</li>
+                      )}
+                    </ul>
+                  )}
                 </div>
               )}
             </div>
@@ -213,13 +178,14 @@ export default function ImportData() {
         <div className="bg-muted/30 p-6 border-t border-border">
           <h4 className="font-bold text-sm mb-4 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-500" />
-            تعليمات هامة للوضع الأوفلاين
+            تعليمات هامة
           </h4>
-          <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside text-right" dir="rtl">
-            <li>يتم تخزين جميع البيانات في متصفحك الحالي فقط (LocalStorage).</li>
-            <li>لن يتم إرسال أي بيانات إلى الخادم، مما يضمن الخصوصية الكاملة.</li>
-            <li>تأكد من استخدام نفس المتصفح للوصول إلى بياناتك لاحقاً.</li>
-            <li>إذا قمت بمسح بيانات المتصفح، سيتم حذف جميع السجلات.</li>
+          <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+            <li>تأكد من عدم وجود صفوف فارغة في بداية الملف.</li>
+            <li>أسماء الأعمدة يجب أن تكون في الصف الأول تماماً.</li>
+            <li>صيغة التاريخ: YYYY-MM-DD أو DD/MM/YYYY.</li>
+            <li>صيغة الوقت: HH:mm أو HH:mm:ss.</li>
+            <li>حمّل القالب واملأه ببياناتك للتأكد من التنسيق الصحيح.</li>
           </ul>
         </div>
       </div>

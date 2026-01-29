@@ -4,11 +4,11 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
 import { ruleEngine, type RuleContext, type RuleEffect } from "./ruleEngine";
-import { api } from "../shared/routes";
+import { api } from "@shared/routes";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, parse, isValid, parseISO, differenceInMinutes, addMinutes, addHours, isSaturday, isFriday, addDays } from "date-fns";
-import type { AuditTrace, InsertSpecialRule } from "../shared/schema";
+import type { AuditTrace, InsertSpecialRule } from "@shared/schema";
 
 // Multer for file uploads (memory storage)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -39,49 +39,23 @@ export async function registerRoutes(
         console.log(`Import ${type}: First row keys:`, Object.keys(data[0] as any));
       }
 
-      const normalizeKey = (value: unknown) =>
-        String(value ?? "")
-          .replace(/\uFEFF/g, "")
-          .trim()
-          .replace(/[\s_]+/g, "")
-          .toLowerCase();
-
-      const buildRowIndex = (row: Record<string, unknown>) => {
-        const index: Record<string, unknown> = {};
-        Object.entries(row).forEach(([key, value]) => {
-          index[normalizeKey(key)] = value;
-        });
-        return index;
-      };
-
-      const readRowValue = (rowIndex: Record<string, unknown>, candidates: string[]) => {
-        for (const candidate of candidates) {
-          const key = normalizeKey(candidate);
-          if (key in rowIndex) {
-            return rowIndex[key];
-          }
-        }
-        return undefined;
-      };
-
       if (type === "master") {
         for (const row of data as any[]) {
-          const rowIndex = buildRowIndex(row);
           // Expected columns - support multiple naming conventions
-          const code = readRowValue(rowIndex, ["كود", "Code", "code", "الرقم", "الكود", "رقم الموظف"]);
-          const name = readRowValue(rowIndex, ["الاسم", "Name", "name", "اسم الموظف"]);
+          const code = row["كود"] || row["Code"] || row["code"] || row["الرقم"] || row["الكود"] || row["رقم الموظف"];
+          const name = row["الاسم"] || row["Name"] || row["name"] || row["اسم الموظف"];
           
           if (code && name) {
             await storage.upsertEmployee({
               code: String(code).trim(),
               name: String(name).trim(),
-              department: readRowValue(rowIndex, ["القسم", "Department", "department"]) || "",
-              section: readRowValue(rowIndex, ["القطاع", "Section"]) || "",
-              job: readRowValue(rowIndex, ["الوظيفة", "Job", "job"]) || "",
-              branch: readRowValue(rowIndex, ["الفرع", "Branch"]) || "",
-              hireDate: readRowValue(rowIndex, ["تاريخ_التعيين", "تاريخ التعيين", "HireDate"]) || "",
-              shiftStart: readRowValue(rowIndex, ["بداية_الوردية", "بداية الوردية", "ShiftStart"]) || "08:00",
-              shiftEnd: readRowValue(rowIndex, ["نهاية_الوردية", "نهاية الوردية", "ShiftEnd"]) || "16:00",
+              department: row["القسم"] || row["Department"] || row["department"] || "",
+              section: row["القطاع"] || row["Section"] || "",
+              job: row["الوظيفة"] || row["Job"] || row["job"] || "",
+              branch: row["الفرع"] || row["Branch"] || "",
+              hireDate: row["تاريخ_التعيين"] || row["تاريخ التعيين"] || row["HireDate"] || "",
+              shiftStart: row["بداية_الوردية"] || row["بداية الوردية"] || row["ShiftStart"] || "08:00",
+              shiftEnd: row["نهاية_الوردية"] || row["نهاية الوردية"] || row["ShiftEnd"] || "16:00",
             });
             processedCount++;
           } else {
@@ -90,9 +64,8 @@ export async function registerRoutes(
         }
       } else if (type === "punches") {
         for (const row of data as any[]) {
-          const rowIndex = buildRowIndex(row);
-          const code = readRowValue(rowIndex, ["كود", "AC-No.", "Code", "code", "الكود", "رقم الموظف"]);
-          const timeRaw = readRowValue(rowIndex, ["التاريخ_والوقت", "التاريخ والوقت", "Time", "Date/Time", "الوقت", "DateTime"]);
+          const code = row["كود"] || row["AC-No."] || row["Code"] || row["code"] || row["الكود"] || row["رقم الموظف"];
+          const timeRaw = row["التاريخ_والوقت"] || row["التاريخ والوقت"] || row["Time"] || row["Date/Time"] || row["الوقت"] || row["DateTime"];
           
           if (code && timeRaw) {
             let timestamp = "";
@@ -137,11 +110,10 @@ export async function registerRoutes(
         }
       } else if (type === "missions") {
         for (const row of data as any[]) {
-          const rowIndex = buildRowIndex(row);
-          const code = readRowValue(rowIndex, ["كود", "Code", "الكود"]);
-          const date = readRowValue(rowIndex, ["التاريخ", "Date"]);
-          const startTime = readRowValue(rowIndex, ["وقت_البداية", "وقت البداية", "StartTime"]);
-          const endTime = readRowValue(rowIndex, ["وقت_النهاية", "وقت النهاية", "EndTime"]);
+          const code = row["كود"] || row["Code"] || row["الكود"];
+          const date = row["التاريخ"] || row["Date"];
+          const startTime = row["وقت_البداية"] || row["وقت البداية"] || row["StartTime"];
+          const endTime = row["وقت_النهاية"] || row["وقت النهاية"] || row["EndTime"];
           
           if (code && date) {
             await storage.addMissions([{
@@ -149,18 +121,17 @@ export async function registerRoutes(
               date: String(date),
               startTime: startTime || "",
               endTime: endTime || "",
-              description: readRowValue(rowIndex, ["الوصف", "Description"]) || ""
+              description: row["الوصف"] || row["Description"] || ""
             }]);
             processedCount++;
           }
         }
       } else if (type === "leaves") {
         for (const row of data as any[]) {
-          const rowIndex = buildRowIndex(row);
-          const code = readRowValue(rowIndex, ["كود", "Code", "الكود"]);
-          const startDate = readRowValue(rowIndex, ["تاريخ_البداية", "تاريخ البداية", "StartDate"]);
-          const endDate = readRowValue(rowIndex, ["تاريخ_النهاية", "تاريخ النهاية", "EndDate"]);
-          const leaveType = readRowValue(rowIndex, ["نوع_الاجازة", "نوع الاجازة", "Type"]);
+          const code = row["كود"] || row["Code"] || row["الكود"];
+          const startDate = row["تاريخ_البداية"] || row["تاريخ البداية"] || row["StartDate"];
+          const endDate = row["تاريخ_النهاية"] || row["تاريخ النهاية"] || row["EndDate"];
+          const leaveType = row["نوع_الاجازة"] || row["نوع الاجازة"] || row["Type"];
           
           if (code && startDate && endDate) {
             await storage.addLeaves([{
@@ -168,7 +139,7 @@ export async function registerRoutes(
               startDate: String(startDate),
               endDate: String(endDate),
               type: leaveType || "اجازة",
-              details: readRowValue(rowIndex, ["ملاحظات", "Notes"]) || ""
+              details: row["ملاحظات"] || row["Notes"] || ""
             }]);
             processedCount++;
           }
@@ -187,20 +158,10 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  // === DATA RETRIEVAL ===
+  // === EMPLOYEES ===
   app.get(api.employees.list.path, async (req, res) => {
     const employees = await storage.getEmployees();
     res.json(employees);
-  });
-
-  app.get("/api/missions", async (req, res) => {
-    const data = await storage.getAllMissions();
-    res.json(data);
-  });
-
-  app.get("/api/leaves", async (req, res) => {
-    const data = await storage.getAllLeaves();
-    res.json(data);
   });
 
   // === ATTENDANCE CALCULATION ENGINE ===
@@ -288,7 +249,6 @@ export async function registerRoutes(
         const missions = await storage.getMissions(emp.code, dateStr);
         if (missions.length > 0) {
           audit.appliedMissions = missions.map(m => `${m.startTime}-${m.endTime}: ${m.description}`);
-          // Consider a mission as a valid punch even if biometric is missing
           if (missions[0].startTime && (!checkIn || missions[0].startTime < checkIn)) {
             checkIn = missions[0].startTime;
             audit.firstStampSource = "mission";
@@ -486,64 +446,11 @@ export async function registerRoutes(
   });
 
   app.get(api.attendance.list.path, async (req, res) => {
-    const month = req.query.month as string;
-    const data = await storage.getDailyAttendance(month);
+    const data = await storage.getDailyAttendance();
     res.json(data);
   });
-
-  // === EXPORTS ===
-  app.get(api.export.attendance.path, async (req, res) => {
-    const data = await storage.getDailyAttendance();
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data.map(d => ({
-      'كود الموظف': d.employeeCode,
-      'التاريخ': d.date,
-      'الدخول': d.firstPunch,
-      'الخروج': d.lastPunch,
-      'الخصم (أيام)': d.totalDeduction,
-      'الإضافي (ساعات)': Number(d.totalOvertime).toFixed(2),
-      'الحالة': d.isAbsent ? 'غياب' : d.isLeave ? 'إجازة' : 'حضور'
-    })));
-    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-    res.setHeader("Content-Disposition", "attachment; filename=attendance.xlsx");
-    res.send(buf);
-  });
-
-  app.get(api.export.summary.path, async (req, res) => {
-    const data = await storage.getDailyAttendance();
-    const employees = await storage.getEmployees();
-    
-    const summaryMap = new Map();
-    employees.forEach(emp => {
-      summaryMap.set(emp.code, {
-        'كود الموظف': emp.code,
-        'الاسم': emp.name,
-        'القسم': emp.department,
-        'إجمالي الغياب (أيام)': 0,
-        'إجمالي الإجازات (أيام)': 0,
-        'إجمالي الخصومات (أيام)': 0,
-        'إجمالي الإضافي (ساعات)': 0
-      });
-    });
-
-    data.forEach(d => {
-      const s = summaryMap.get(d.employeeCode);
-      if (s) {
-        if (d.isAbsent) s['إجمالي الغياب (أيام)'] += 1;
-        if (d.isLeave) s['إجمالي الإجازات (أيام)'] += 1;
-        s['إجمالي الخصومات (أيام)'] += (d.totalDeduction || 0);
-        s['إجمالي الإضافي (ساعات)'] += (Number(d.totalOvertime) || 0);
-      }
-    });
-
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(Array.from(summaryMap.values()));
-    XLSX.utils.book_append_sheet(wb, ws, "Salary Summary");
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-    res.setHeader("Content-Disposition", "attachment; filename=salary_summary.xlsx");
-    res.send(buf);
-  });
+  
+  // === TEMPLATES ===
   app.get("/api/templates/:type", async (req, res) => {
     const type = req.params.type;
     const wb = XLSX.utils.book_new();

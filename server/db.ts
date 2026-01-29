@@ -1,7 +1,7 @@
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import * as schema from "../shared/schema";
+import * as schema from "@shared/schema";
 
 // Dummy DB connection for template compliance.
 // We are using in-memory storage for this application as requested.

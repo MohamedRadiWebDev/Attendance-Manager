@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useAttendance, useCalculateAttendance } from "@/hooks/use-attendance";
 import { useEmployees } from "@/hooks/use-employees";
 import { normalizeArabic, buildSearchIndex, matchesSearch } from "@/lib/arabicSearch";
-import { format, isValid } from "date-fns";
+import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { 
   Loader2, 
@@ -54,27 +54,13 @@ function parseAudit(logs: string[] | null): AuditTrace | null {
 export default function Attendance() {
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
-  const [page, setPage] = useState(1);
-  const pageSize = 50;
-
   const { data: attendance, isLoading } = useAttendance();
   const { data: employees } = useEmployees();
   const { mutate: calculate, isPending: isCalculating } = useCalculateAttendance();
 
-  // Auto-calculate if data was just imported
-  useMemo(() => {
-    const handler = () => {
-      if (!isCalculating) {
-        calculate(undefined);
-      }
-    };
-    window.addEventListener('data_imported', handler);
-    return () => window.removeEventListener('data_imported', handler);
-  }, [calculate, isCalculating]);
-
   const employeeMap = useMemo(() => {
     const map = new Map<string, { name: string; department: string; branch: string }>();
-    employees?.forEach((e: any) => {
+    employees?.forEach(e => {
       map.set(e.code, { name: e.name, department: e.department || "", branch: e.branch || "" });
     });
     return map;
@@ -86,15 +72,11 @@ export default function Attendance() {
 
   const filteredData = useMemo(() => {
     if (!attendance) return [];
-    
-    // Sort attendance by date descending
-    const sorted = [...attendance].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    if (!search) return sorted;
+    if (!search) return attendance;
 
     const normalizedSearch = normalizeArabic(search);
     
-    return sorted.filter(record => {
+    return attendance.filter(record => {
       const emp = getEmployeeInfo(record.employeeCode);
       const searchIndex = buildSearchIndex([
         record.employeeCode,
@@ -106,13 +88,6 @@ export default function Attendance() {
       return searchIndex.includes(normalizedSearch);
     });
   }, [attendance, search, getEmployeeInfo]);
-
-  const paginatedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredData.slice(start, start + pageSize);
-  }, [filteredData, page]);
-
-  const totalPages = Math.ceil(filteredData.length / pageSize);
 
   const getStatusBadge = (record: any) => {
     if (record.isAbsent) return (
@@ -142,7 +117,7 @@ export default function Attendance() {
     );
   };
 
-  const audit = selectedRecord ? parseAudit(selectedRecord.logs || null) : null;
+  const audit = selectedRecord ? parseAudit(selectedRecord.logs) : null;
 
   return (
     <div className="space-y-8 h-full flex flex-col animate-in fade-in duration-500">
@@ -154,7 +129,7 @@ export default function Attendance() {
         
         <div className="flex gap-3">
           <Button
-            onClick={() => calculate(undefined)}
+            onClick={() => calculate()}
             disabled={isCalculating}
             data-testid="button-calculate"
           >
@@ -212,24 +187,19 @@ export default function Attendance() {
                     <p className="mt-2 text-muted-foreground">جاري تحميل البيانات...</p>
                   </td>
                 </tr>
-              ) : paginatedData.length === 0 ? (
+              ) : filteredData.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="text-center py-20 text-muted-foreground">
                     لا توجد سجلات مطابقة
                   </td>
                 </tr>
               ) : (
-                paginatedData.map((record) => {
+                filteredData.map((record) => {
                   const emp = getEmployeeInfo(record.employeeCode);
-                  const recordDate = new Date(record.date);
-                  const formattedDate = isValid(recordDate) 
-                    ? format(recordDate, 'dd MMMM yyyy', { locale: ar })
-                    : record.date;
-                    
                   return (
                     <tr key={record.id} className="group hover:bg-muted/30 transition-colors" data-testid={`row-attendance-${record.id}`}>
                       <td className="px-6 py-4 text-sm font-medium">
-                        {formattedDate}
+                        {format(new Date(record.date), 'dd MMMM yyyy', { locale: ar })}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
@@ -284,35 +254,6 @@ export default function Attendance() {
             </tbody>
           </table>
         </div>
-        
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-border flex items-center justify-between bg-muted/10">
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                السابق
-              </Button>
-              <div className="flex items-center gap-1 px-4 text-sm font-medium">
-                صفحة {page} من {totalPages}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                التالي
-              </Button>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              عرض {paginatedData.length} من أصل {filteredData.length} سجل
-            </div>
-          </div>
-        )}
       </div>
 
       <Dialog open={!!selectedRecord} onOpenChange={() => setSelectedRecord(null)}>
@@ -334,11 +275,7 @@ export default function Attendance() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">التاريخ:</span>
-                    <span className="font-bold mr-2">
-                      {isValid(new Date(selectedRecord.date)) 
-                        ? format(new Date(selectedRecord.date), 'dd MMMM yyyy', { locale: ar })
-                        : selectedRecord.date}
-                    </span>
+                    <span className="font-bold mr-2">{format(new Date(selectedRecord.date), 'dd MMMM yyyy', { locale: ar })}</span>
                   </div>
                 </div>
               </div>

@@ -1,28 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
-import { type InsertEmployee, type Employee } from "@shared/schema";
-import { useToast } from "@/hooks/use-toast";
-import { localStore } from "@/lib/localStorage";
 
 export function useEmployees() {
-  return useQuery<Employee[]>({
+  return useQuery({
     queryKey: [api.employees.list.path],
-    queryFn: () => localStore.getEmployees(),
-  });
-}
-
-export function useUpsertEmployee() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (data: InsertEmployee) => localStore.upsertEmployee(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.employees.list.path] });
-      toast({
-        title: "تم الحفظ",
-        description: "تم حفظ بيانات الموظف بنجاح.",
-      });
+    queryFn: async () => {
+      const res = await fetch(api.employees.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("فشل جلب بيانات الموظفين");
+      return api.employees.list.responses[200].parse(await res.json());
     },
   });
 }

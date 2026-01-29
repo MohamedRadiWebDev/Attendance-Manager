@@ -1,0 +1,71 @@
+
+Shift rules (match Excel precedence):
+- ShiftStart comes from master/template values
+- ShiftEnd must match Excel’s rule behavior:
+  - If day is Saturday:
+      - If job == "خدمات معاونة" => +7 hours
+      - Else => +6 hours
+  - Else => +8 hours
+- Do NOT hardcode alternative durations unless explicitly configured.
+- Provide a Shift Rules UI so HR can adjust durations safely (with defaults matching the workbook).
+
+“Excused Not Present” suppressor (must match Excel):
+- If any of these exist, penalties should be suppressed:
+  - leave flags (paid/unpaid/sick)
+  - weekly rest
+  - official holiday
+  - joining period (date before hire)
+  - leaving period (date after termination)
+  - special note meaning attendance not required ("بدون حضور وانصراف")
+- Implement the same precedence: suppress penalties BEFORE computing lateness/early/missing/absence.
+
+Penalty rules (match Excel behavior and thresholds):
+- Late Arrival (التأخيرات):
+  - computed only if NOT suppressed and NOT missing-stamp and NOT “without attendance tracking”
+  - lateness = FirstStamp - ShiftStart
+  - tier table:
+      0–15 min => 0
+      16–30 min => 0.25
+      31–60 min => 0.5
+      61+ min  => 1
+  - If penalty == 0, show blank like Excel (not 0)
+- Early Leave (انصراف بدون اذن):
+  - computed only if NOT suppressed and NOT missing-stamp and NOT “without attendance tracking”
+  - early = ShiftEnd - LastStamp
+  - if early > 5 minutes => 0.5 (else blank)
+- Missing Stamp (عدم بصمة):
+  - if not suppressed AND FirstStamp exists AND LastStamp == FirstStamp => 0.5
+- Absence (غياب بدون اذن):
+  - if not suppressed AND TotalWorkingHours is blank => 1
+  - In summary, absence is multiplied by 2 (absence * 2)
+- Disciplinary penalties (جزاءات تأديبية) are manual inputs (like Excel).
+- Deduction status per day:
+  - If sum of penalties > 0 => "يوجد جزاء" else blank
+- Monthly status:
+  - If any day has "يوجد جزاء" => "يوجد خصم"
+
+Missions & Permissions behavior:
+- Missions/Permissions act as time sources for First/Last stamps.
+- They also have computed duration fields.
+- Permission totals (hours + counts) are aggregated per employee in summary.
+
+Overtime:
+- Candidate overtime windows:
+  - Early OT: if FirstStamp < ShiftStart => ShiftStart - FirstStamp
+  - Late OT:  if LastStamp > ShiftEnd  => LastStamp - ShiftEnd
+- In the workbook, day/night OT fields may be manual; replicate exactly:
+  - keep Day OT and Night OT editable fields
+  - Total OT = Day OT + Night OT
+- Convert OT to days in summary:
+  - OT_days = MIN( (OT_hours * 24) / 8 , 6 )
+- Do NOT subtract OT from deductions unless the Excel template explicitly does so.
+
+SPECIAL CASES (حالة خاصة) – OVERRIDE ENGINE
+- Provide UI to create override rules:
+  - employee + date range + rule type + description
+- Rule types examples:
+  - Attendance exempt (no attendance required)
+  - Custom shift (override shift start/end or duration)
+  - Manual penalty override (set specific penalty values)
+  - Ignore biometric punches for a range
+- Overrides must apply BEFORE penalty calculation (like Excel “بدون حضور وانصراف” effect).

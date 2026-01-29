@@ -1,16 +1,20 @@
 import { useExportAttendance, useExportSummary } from "@/hooks/use-attendance";
 import { FileDown, FileText, Loader2 } from "lucide-react";
-import * as XLSX from "xlsx";
+import { cn } from "@/lib/utils";
 
 export default function Reports() {
   const { mutate: exportAttendance, isPending: loadingAttendance } = useExportAttendance();
   const { mutate: exportSummary, isPending: loadingSummary } = useExportSummary();
 
-  const handleDownload = (data: any, filename: string) => {
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
-    XLSX.writeFile(wb, filename);
+  const handleDownload = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   return (
@@ -30,7 +34,7 @@ export default function Reports() {
             تصدير ملف Excel يحتوي على جميع سجلات الحضور اليومية، التأخيرات، والغياب.
           </p>
           <button
-            onClick={() => exportAttendance(undefined, { onSuccess: (data) => handleDownload(data, 'attendance_detailed.xlsx') })}
+            onClick={() => exportAttendance(undefined, { onSuccess: (blob) => handleDownload(blob, 'attendance_detailed.xlsx') })}
             disabled={loadingAttendance}
             className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
           >
@@ -48,7 +52,7 @@ export default function Reports() {
             تصدير ملخص جاهز للمرتبات يحتوي على إجمالي أيام الخصم، الغياب، والإضافي لكل موظف.
           </p>
           <button
-            onClick={() => exportSummary(undefined, { onSuccess: (data) => handleDownload(data, 'monthly_summary.xlsx') })}
+            onClick={() => exportSummary(undefined, { onSuccess: (blob) => handleDownload(blob, 'monthly_summary.xlsx') })}
             disabled={loadingSummary}
             className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 font-medium"
           >

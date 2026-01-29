@@ -7,13 +7,10 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import Dashboard from "@/pages/Dashboard";
 import Attendance from "@/pages/Attendance";
-import Punches from "@/pages/Punches";
 import ImportData from "@/pages/ImportData";
 import SpecialCases from "@/pages/SpecialCases";
 import Reports from "@/pages/Reports";
 import Employees from "@/pages/Employees";
-import Missions from "@/pages/Missions";
-import Leaves from "@/pages/Leaves";
 import NotFound from "@/pages/not-found";
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -38,9 +35,6 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/attendance" component={Attendance} />
-        <Route path="/punches" component={Punches} />
-        <Route path="/missions" component={Missions} />
-        <Route path="/leaves" component={Leaves} />
         <Route path="/import" component={ImportData} />
         <Route path="/special-cases" component={SpecialCases} />
         <Route path="/reports" component={Reports} />

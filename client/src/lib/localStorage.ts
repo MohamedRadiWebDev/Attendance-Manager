@@ -1,4 +1,3 @@
-
 import { 
   type Employee, type InsertEmployee,
   type Punch, type InsertPunch,
@@ -20,8 +19,7 @@ const KEYS = {
   ID_COUNTERS: 'attendance_counters'
 };
 
-// Quota management: Limit logs and records to save space
-const MAX_LOG_SIZE = 500; // chars per record
+const MAX_LOG_SIZE = 500;
 const MAX_PUNCHES = 50000;
 const MAX_ATTENDANCE = 10000;
 
@@ -39,14 +37,11 @@ class LocalStorageProvider {
 
   private setItem<T>(key: string, value: T): void {
     try {
-      const stringified = JSON.stringify(value);
-      localStorage.setItem(key, stringified);
+      localStorage.setItem(key, JSON.stringify(value));
       window.dispatchEvent(new Event('storage'));
     } catch (e) {
       if (e instanceof Error && e.name === 'QuotaExceededError') {
-        console.error(`[DEBUG] Quota exceeded for "${key}". Attempting cleanup...`);
         this.emergencyCleanup();
-        // Retry once after cleanup
         try {
           localStorage.setItem(key, JSON.stringify(value));
         } catch (retryError) {
@@ -59,16 +54,10 @@ class LocalStorageProvider {
   }
 
   private emergencyCleanup(): void {
-    // Keep employees and rules, trim large transactional data
     const punches = this.getItem<Punch[]>(KEYS.PUNCHES, []);
-    if (punches.length > 10000) {
-      this.setItem(KEYS.PUNCHES, punches.slice(-10000));
-    }
+    if (punches.length > 10000) this.setItem(KEYS.PUNCHES, punches.slice(-10000));
     const att = this.getItem<DailyAttendance[]>(KEYS.ATTENDANCE, []);
-    if (att.length > 2000) {
-      this.setItem(KEYS.ATTENDANCE, att.slice(-2000));
-    }
-    console.warn("[DEBUG] Emergency cleanup performed: trimmed punches and attendance records.");
+    if (att.length > 2000) this.setItem(KEYS.ATTENDANCE, att.slice(-2000));
   }
 
   private getNextIds(type: string, count: number): number[] {
@@ -92,7 +81,6 @@ class LocalStorageProvider {
     const employees = await this.getEmployees();
     const existingIdx = employees.findIndex(e => e.code === employee.code);
     let result: Employee;
-    
     if (existingIdx > -1) {
       result = { ...employees[existingIdx], ...employee };
       employees[existingIdx] = result;
@@ -110,14 +98,8 @@ class LocalStorageProvider {
     newPunches.forEach((p, idx) => {
       punches.push({ ...p, id: ids[idx] } as Punch);
     });
-    
-    // Limit to MAX_PUNCHES
-    if (punches.length > MAX_PUNCHES) {
-      punches = punches.slice(-MAX_PUNCHES);
-    }
-    
+    if (punches.length > MAX_PUNCHES) punches = punches.slice(-MAX_PUNCHES);
     this.setItem(KEYS.PUNCHES, punches);
-    console.log(`[DEBUG] Saved ${newPunches.length} punches. Total now: ${punches.length}`);
   }
 
   async getAllPunches(): Promise<Punch[]> {
@@ -128,28 +110,18 @@ class LocalStorageProvider {
     let existing = this.getItem<DailyAttendance[]>(KEYS.ATTENDANCE, []);
     const map = new Map<string, DailyAttendance>();
     existing.forEach(d => map.set(`${d.employeeCode}_${d.date}`, d));
-    
     const newRecordsToGenIds = records.filter(r => !map.has(`${r.employeeCode}_${r.date}`));
     const ids = this.getNextIds('att', newRecordsToGenIds.length);
-    
     let idIdx = 0;
     records.forEach(r => {
       const key = `${r.employeeCode}_${r.date}`;
       const existingRecord = map.get(key);
       const id = existingRecord?.id || ids[idIdx++];
-      
-      // Trim logs to save space
       const trimmedLogs = r.logs?.map(l => l.substring(0, MAX_LOG_SIZE)) || [];
-      
       map.set(key, { ...r, id, logs: trimmedLogs } as DailyAttendance);
     });
-    
     let allRecords = Array.from(map.values());
-    // Limit to MAX_ATTENDANCE
-    if (allRecords.length > MAX_ATTENDANCE) {
-      allRecords = allRecords.slice(-MAX_ATTENDANCE);
-    }
-    
+    if (allRecords.length > MAX_ATTENDANCE) allRecords = allRecords.slice(-MAX_ATTENDANCE);
     this.setItem(KEYS.ATTENDANCE, allRecords);
   }
 
@@ -177,6 +149,17 @@ class LocalStorageProvider {
 
   async getAllLeaves(): Promise<Leave[]> {
     return this.getItem<Leave[]>(KEYS.LEAVES, []);
+  }
+
+  async addPermissions(items: InsertPermission[]): Promise<void> {
+    const perms = this.getItem<Permission[]>(KEYS.PERMISSIONS, []);
+    const ids = this.getNextIds('perm', items.length);
+    items.forEach((i, idx) => perms.push({ ...i, id: ids[idx] } as Permission));
+    this.setItem(KEYS.PERMISSIONS, perms);
+  }
+
+  async getAllPermissions(): Promise<Permission[]> {
+    return this.getItem<Permission[]>(KEYS.PERMISSIONS, []);
   }
 
   async getSpecialRules(): Promise<SpecialRule[]> {

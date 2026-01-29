@@ -1,13 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
 import { type InsertSpecialRule, type SpecialRule } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { localStore } from "@/lib/localStorage";
+import { apiRequest } from "@/lib/queryClient";
 
 export function useSpecialRules() {
   return useQuery<SpecialRule[]>({
     queryKey: [api.specialRules.list.path],
-    queryFn: () => localStore.getSpecialRules(),
   });
 }
 
@@ -16,12 +15,49 @@ export function useCreateSpecialRule() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (data: InsertSpecialRule) => localStore.addSpecialRule(data),
+    mutationFn: async (data: InsertSpecialRule) => {
+      const res = await apiRequest(api.specialRules.create.method, api.specialRules.create.path, data);
+      return res as unknown as SpecialRule;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.specialRules.list.path] });
       toast({
         title: "تمت الإضافة",
         description: "تم إضافة القاعدة بنجاح.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "خطأ",
+        description: "تعذر إضافة القاعدة.",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useUpdateSpecialRule() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertSpecialRule> }) => {
+      const url = buildUrl(api.specialRules.update.path, { id });
+      const res = await apiRequest(api.specialRules.update.method, url, data);
+      return res as unknown as SpecialRule;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.specialRules.list.path] });
+      toast({
+        title: "تم التحديث",
+        description: "تم تحديث القاعدة بنجاح.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "خطأ",
+        description: "تعذر تحديث القاعدة.",
+        variant: "destructive",
       });
     },
   });
@@ -32,7 +68,10 @@ export function useDeleteSpecialRule() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (id: number) => localStore.deleteSpecialRule(id),
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.specialRules.delete.path, { id });
+      await apiRequest(api.specialRules.delete.method, url);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.specialRules.list.path] });
       toast({
@@ -49,11 +88,31 @@ export function useImportSpecialRules() {
 
   return useMutation({
     mutationFn: async (file: File) => {
-      // Stub for local import
-      return { success: true, count: 0, errors: [] };
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(api.specialRules.import.path, {
+        method: api.specialRules.import.method,
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("فشل استيراد القواعد");
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.specialRules.list.path] });
-    }
+      toast({
+        title: "تم الاستيراد",
+        description: `تم استيراد ${data.count} قاعدة بنجاح.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "خطأ",
+        description: "تعذر استيراد القواعد.",
+        variant: "destructive",
+      });
+    },
   });
 }
