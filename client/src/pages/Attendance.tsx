@@ -221,10 +221,15 @@ export default function Attendance() {
               ) : (
                 paginatedData.map((record) => {
                   const emp = getEmployeeInfo(record.employeeCode);
+                  const recordDate = new Date(record.date);
+                  const formattedDate = isValid(recordDate) 
+                    ? format(recordDate, 'dd MMMM yyyy', { locale: ar })
+                    : record.date;
+                    
                   return (
                     <tr key={record.id} className="group hover:bg-muted/30 transition-colors" data-testid={`row-attendance-${record.id}`}>
                       <td className="px-6 py-4 text-sm font-medium">
-                        {format(new Date(record.date), 'dd MMMM yyyy', { locale: ar })}
+                        {formattedDate}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
@@ -329,7 +334,11 @@ export default function Attendance() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">التاريخ:</span>
-                    <span className="font-bold mr-2">{format(new Date(selectedRecord.date), 'dd MMMM yyyy', { locale: ar })}</span>
+                    <span className="font-bold mr-2">
+                      {isValid(new Date(selectedRecord.date)) 
+                        ? format(new Date(selectedRecord.date), 'dd MMMM yyyy', { locale: ar })
+                        : selectedRecord.date}
+                    </span>
                   </div>
                 </div>
               </div>

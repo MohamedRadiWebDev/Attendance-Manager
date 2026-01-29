@@ -2,13 +2,36 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { localStore } from "@/lib/localStorage";
+import { isValid, parseISO, format } from "date-fns";
+
+// Robust date parsing
+const safeParseDate = (dateStr: string) => {
+  if (!dateStr) return null;
+  // Try ISO first
+  let date = parseISO(dateStr);
+  if (isValid(date)) return date;
+  
+  // Try standard Date constructor
+  date = new Date(dateStr);
+  if (isValid(date)) return date;
+  
+  return null;
+};
+
+const safeFormatDate = (dateStr: string) => {
+  const date = safeParseDate(dateStr);
+  return date ? format(date, "yyyy-MM-dd") : null;
+};
 
 // Helper to check if a date falls within a range
-const isDateInRange = (dateStr: string, startStr: string, endStr: string) => {
-  const date = new Date(dateStr).getTime();
-  const start = new Date(startStr).getTime();
-  const end = new Date(endStr).getTime();
-  return date >= start && date <= end;
+const isDateInRange = (targetStr: string, startStr: string, endStr: string) => {
+  const target = safeParseDate(targetStr);
+  const start = safeParseDate(startStr);
+  const end = safeParseDate(endStr);
+  
+  if (!target || !start || !end) return false;
+  
+  return target.getTime() >= start.getTime() && target.getTime() <= end.getTime();
 };
 
 export function useAttendance(month?: string) {
@@ -35,29 +58,45 @@ export function useCalculateAttendance() {
       const rules = await localStore.getSpecialRules();
       
       const processedRecords = [];
-      // If no date provided, calculate for all dates found in punches/missions/leaves
       const allDates = new Set<string>();
+      
       if (targetDate) {
-        allDates.add(targetDate);
+        const formatted = safeFormatDate(targetDate);
+        if (formatted) allDates.add(formatted);
       } else {
-        punches.forEach(p => allDates.add(p.timestamp.split(' ')[0]));
-        missions.forEach(m => allDates.add(m.date));
+        punches.forEach(p => {
+          const d = safeFormatDate(p.timestamp.split(' ')[0]);
+          if (d) allDates.add(d);
+        });
+        missions.forEach(m => {
+          const d = safeFormatDate(m.date);
+          if (d) allDates.add(d);
+        });
         leaves.forEach(l => {
-          // Simplified: just add start date, or we could iterate range
-          allDates.add(l.startDate);
+          const d = safeFormatDate(l.startDate);
+          if (d) allDates.add(d);
         });
       }
 
       for (const date of Array.from(allDates)) {
         for (const emp of employees) {
-          const empPunches = punches.filter(p => p.employeeCode === emp.code && p.timestamp.startsWith(date));
-          const empMissions = missions.filter(m => m.employeeCode === emp.code && m.date === date);
-          const empLeaves = leaves.filter(l => l.employeeCode === emp.code && isDateInRange(date, l.startDate, l.endDate));
+          const empPunches = punches.filter(p => {
+            const pDate = safeFormatDate(p.timestamp.split(' ')[0]);
+            return p.employeeCode === emp.code && pDate === date;
+          });
+          
+          const empMissions = missions.filter(m => {
+            const mDate = safeFormatDate(m.date);
+            return m.employeeCode === emp.code && mDate === date;
+          });
+          
+          const empLeaves = leaves.filter(l => 
+            l.employeeCode === emp.code && isDateInRange(date, l.startDate, l.endDate)
+          );
           
           if (empPunches.length > 0 || empMissions.length > 0 || empLeaves.length > 0) {
             const sortedPunches = empPunches.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
             
-            // Basic logic: Mission/Leave overrides punches
             const isLeave = empLeaves.length > 0;
             const isMission = empMissions.length > 0;
             
@@ -84,7 +123,7 @@ export function useCalculateAttendance() {
                 appliedMissions: empMissions.map(m => m.description),
                 appliedLeaves: empLeaves.map(l => l.type),
                 date: date,
-                notes: ["تم الربط التلقائي بين البصمات والمأموريات والإجازات"]
+                notes: ["تم الربط التلقائي والتحقق من صحة التواريخ"]
               })}`]
             });
           }
@@ -101,7 +140,7 @@ export function useCalculateAttendance() {
       queryClient.invalidateQueries();
       toast({
         title: "تم تحديث البيانات",
-        description: `تمت معالجة ${data.processedCount} سجل وربطهم بكافة المديولات.`,
+        description: `تمت معالجة ${data.processedCount} سجل بنجاح.`,
       });
     },
   });
