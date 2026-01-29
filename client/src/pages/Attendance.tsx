@@ -4,7 +4,6 @@ import { useEmployees } from "@/hooks/use-employees";
 import { normalizeArabic, buildSearchIndex, matchesSearch } from "@/lib/arabicSearch";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
-import { Input } from "@/components/ui/input";
 import { 
   Loader2, 
   RefreshCw, 
@@ -26,7 +25,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { type Employee } from "@shared/schema";
 
 type AuditTrace = {
   rawPunches: string[];
@@ -56,15 +54,9 @@ function parseAudit(logs: string[] | null): AuditTrace | null {
 export default function Attendance() {
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
-  const [monthFilter, setMonthFilter] = useState(format(new Date(), 'yyyy-MM'));
-  const attendanceQuery = useAttendance(monthFilter);
-  const attendance = (attendanceQuery.data as any[]) || [];
-  const isLoading = attendanceQuery.isLoading;
-  const employeesQuery = useEmployees();
-  const employees = (employeesQuery.data as any[]) || [];
-  const calculateMutation = useCalculateAttendance();
-  const isCalculating = calculateMutation.isPending;
-  const calculate = () => calculateMutation.mutate();
+  const { data: attendance, isLoading } = useAttendance();
+  const { data: employees } = useEmployees();
+  const { mutate: calculate, isPending: isCalculating } = useCalculateAttendance();
 
   const employeeMap = useMemo(() => {
     const map = new Map<string, { name: string; department: string; branch: string }>();
@@ -135,14 +127,7 @@ export default function Attendance() {
           <p className="text-muted-foreground mt-2">عرض تفصيلي لسجلات الحضور اليومية.</p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <Input
-            type="month"
-            value={monthFilter}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMonthFilter(e.target.value)}
-            className="w-[200px]"
-            data-testid="input-month-filter"
-          />
+        <div className="flex gap-3">
           <Button
             onClick={() => calculate()}
             disabled={isCalculating}

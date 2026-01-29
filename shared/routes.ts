@@ -64,15 +64,6 @@ export const api = {
       }
     }
   },
-  punches: {
-    list: {
-      method: "GET" as const,
-      path: "/api/punches",
-      responses: {
-        200: z.array(z.custom<typeof punches.$inferSelect>()),
-      }
-    }
-  },
   
   attendance: {
     // Get calculated daily grid
