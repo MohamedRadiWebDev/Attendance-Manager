@@ -2,8 +2,6 @@ import { useState } from "react";
 import { useImportFile } from "@/hooks/use-import";
 import { Upload, FileSpreadsheet, Check, AlertTriangle, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { buildApiUrl } from "@/lib/api";
-import { isOfflineModeEnabled } from "@/lib/offlineStore";
 import * as XLSX from "xlsx";
 
 const columnSpecs = {
@@ -36,11 +34,6 @@ export default function ImportData() {
   };
 
   const downloadTemplate = (type: string) => {
-    if (!isOfflineModeEnabled()) {
-      window.open(buildApiUrl(`/api/templates/${type}`), "_blank");
-      return;
-    }
-
     const wb = XLSX.utils.book_new();
     let ws = XLSX.utils.aoa_to_sheet([[]]);
     let filename = "template.xlsx";
@@ -101,7 +94,7 @@ export default function ImportData() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-bold font-cairo text-foreground">استيراد البيانات</h1>
-        <p className="text-muted-foreground mt-2">رفع ملفات Excel الخاصة بالنظام.</p>
+        <p className="text-muted-foreground mt-2">رفع ملفات Excel الخاصة بالنظام (وضع الأوفلاين).</p>
       </div>
 
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -176,16 +169,6 @@ export default function ImportData() {
                       <>لم يتم استيراد أي سجلات - تحقق من أسماء الأعمدة</>
                     )}
                   </p>
-                  {lastResult.errors && lastResult.errors.length > 0 && (
-                    <ul className="mt-2 text-sm text-red-600 dark:text-red-400 space-y-1">
-                      {lastResult.errors.slice(0, 5).map((err: string, i: number) => (
-                        <li key={i}>{err}</li>
-                      ))}
-                      {lastResult.errors.length > 5 && (
-                        <li>... و {lastResult.errors.length - 5} أخطاء أخرى</li>
-                      )}
-                    </ul>
-                  )}
                 </div>
               )}
             </div>
@@ -230,14 +213,13 @@ export default function ImportData() {
         <div className="bg-muted/30 p-6 border-t border-border">
           <h4 className="font-bold text-sm mb-4 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-500" />
-            تعليمات هامة
+            تعليمات هامة للوضع الأوفلاين
           </h4>
-          <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
-            <li>تأكد من عدم وجود صفوف فارغة في بداية الملف.</li>
-            <li>أسماء الأعمدة يجب أن تكون في الصف الأول تماماً.</li>
-            <li>صيغة التاريخ: YYYY-MM-DD أو DD/MM/YYYY.</li>
-            <li>صيغة الوقت: HH:mm أو HH:mm:ss.</li>
-            <li>حمّل القالب واملأه ببياناتك للتأكد من التنسيق الصحيح.</li>
+          <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside text-right" dir="rtl">
+            <li>يتم تخزين جميع البيانات في متصفحك الحالي فقط (LocalStorage).</li>
+            <li>لن يتم إرسال أي بيانات إلى الخادم، مما يضمن الخصوصية الكاملة.</li>
+            <li>تأكد من استخدام نفس المتصفح للوصول إلى بياناتك لاحقاً.</li>
+            <li>إذا قمت بمسح بيانات المتصفح، سيتم حذف جميع السجلات.</li>
           </ul>
         </div>
       </div>

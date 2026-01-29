@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { localStore } from "@/lib/localStorage";
 import * as XLSX from "xlsx";
 
-type ImportType = 'punches' | 'master' | 'missions' | 'leaves';
+type ImportType = 'punches' | 'master' | 'missions' | 'leaves' | 'attendance';
 
 export function useImportFile() {
   const { toast } = useToast();
@@ -72,11 +72,26 @@ export function useImportFile() {
           
           await localStore.saveDailyAttendance(records as any[]);
         }
-        return { success: true, count: rows.length };
+        
+        // Return details for toast
+        return { success: true, count: rows.length, type };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Force immediate invalidation of all related queries
       queryClient.invalidateQueries();
-      toast({ title: "تم الاستيراد بنجاح" });
+      
+      toast({ 
+        title: "تم الاستيراد بنجاح",
+        description: `تم استيراد ${data.count} سجل من نوع ${data.type}`
+      });
+    },
+    onError: (error) => {
+      console.error("Import Error:", error);
+      toast({
+        title: "فشل الاستيراد",
+        description: "حدث خطأ أثناء معالجة الملف. تأكد من صحة البيانات.",
+        variant: "destructive"
+      });
     }
   });
 }
