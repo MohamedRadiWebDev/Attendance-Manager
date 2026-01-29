@@ -1,16 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
 import { localStore } from "@/lib/localStorage";
 import { Loader2, Fingerprint, Search } from "lucide-react";
 import { useState, useMemo } from "react";
-import { format } from "date-fns";
-import { ar } from "date-fns/locale";
 import { useEmployees } from "@/hooks/use-employees";
 
 export default function Punches() {
   const [search, setSearch] = useState("");
   const { data: punches, isLoading } = useQuery({
-    queryKey: [api.punches.list.path],
+    queryKey: ["/api/punches"],
     queryFn: () => localStore.getAllPunches(),
   });
   const { data: employees } = useEmployees();
@@ -23,7 +20,6 @@ export default function Punches() {
 
   const filteredPunches = useMemo(() => {
     if (!punches) return [];
-    // Sort by timestamp desc
     const sorted = [...punches].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
     if (!search) return sorted;
     return sorted.filter(p => 
