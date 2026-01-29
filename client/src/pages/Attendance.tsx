@@ -4,6 +4,7 @@ import { useEmployees } from "@/hooks/use-employees";
 import { normalizeArabic, buildSearchIndex, matchesSearch } from "@/lib/arabicSearch";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+import { Input } from "@/components/ui/input";
 import { 
   Loader2, 
   RefreshCw, 
@@ -54,7 +55,8 @@ function parseAudit(logs: string[] | null): AuditTrace | null {
 export default function Attendance() {
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
-  const { data: attendance, isLoading } = useAttendance();
+  const [monthFilter, setMonthFilter] = useState(format(new Date(), 'yyyy-MM'));
+  const { data: attendance, isLoading } = useAttendance(monthFilter);
   const { data: employees } = useEmployees();
   const { mutate: calculate, isPending: isCalculating } = useCalculateAttendance();
 
@@ -127,7 +129,14 @@ export default function Attendance() {
           <p className="text-muted-foreground mt-2">عرض تفصيلي لسجلات الحضور اليومية.</p>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <Input
+            type="month"
+            value={monthFilter}
+            onChange={(e: any) => setMonthFilter(e.target.value)}
+            className="w-[200px]"
+            data-testid="input-month-filter"
+          />
           <Button
             onClick={() => calculate()}
             disabled={isCalculating}

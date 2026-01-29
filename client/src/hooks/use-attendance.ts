@@ -75,17 +75,14 @@ export function useCalculateAttendance() {
           const empPunches = punches.filter(p => safeFormatDate(p.timestamp.split(' ')[0]) === date && p.employeeCode === emp.code);
           const empMissions = missions.filter(m => safeFormatDate(m.date) === date && m.employeeCode === emp.code);
           const empLeaves = leaves.filter(l => l.employeeCode === emp.code && isDateInRange(date, l.startDate, l.endDate));
-          // perms not used in calculation yet
           const empRules = rules.filter((r: SpecialRule) => r.scopeValues?.includes(emp.code) && (!r.dateFrom || isDateInRange(date, r.dateFrom, r.dateTo || r.dateFrom)));
 
-          // Rule engine: Excused Not Present
           const isLeave = empLeaves.length > 0;
           const isMission = empMissions.length > 0;
           const isExempt = empRules.some(r => r.ruleType === 'attendance_exempt');
           const isRest = dayOfWeek === 5; // Friday
           const isSuppressed = isLeave || isMission || isExempt || isRest;
 
-          // Shift Rules
           let shiftStart = emp.shiftStart || "08:00";
           let shiftEnd = "16:00";
           if (dayOfWeek === 6) { // Saturday
@@ -98,7 +95,6 @@ export function useCalculateAttendance() {
           let firstPunch = sortedPunches[0]?.timestamp.split(' ')[1] || (isMission ? "08:00" : null);
           let lastPunch = sortedPunches[sortedPunches.length - 1]?.timestamp.split(' ')[1] || (isMission ? "16:00" : null);
 
-          // Penalty Calculation
           let latePenalty = 0;
           let earlyPenalty = 0;
           let missingStampPenalty = 0;
@@ -107,7 +103,7 @@ export function useCalculateAttendance() {
 
           if (!isSuppressed) {
             if (!firstPunch && !lastPunch) {
-              absencePenalty = 2; // Absence * 2
+              absencePenalty = 2;
               penalties.push({ type: 'absence', value: 2, reason: 'غياب بدون اذن' });
             } else if (firstPunch && lastPunch === firstPunch) {
               missingStampPenalty = 0.5;
@@ -153,10 +149,13 @@ export function useCalculateAttendance() {
         }
       }
       if (processedRecords.length > 0) await localStore.saveDailyAttendance(processedRecords as any);
+      // Force trigger storage event for cross-tab or current view update
+      window.dispatchEvent(new Event('storage'));
       return { success: true, processedCount: processedRecords.length };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries();
+      // Direct cache invalidation
+      queryClient.invalidateQueries({ queryKey: [api.attendance.list.path] });
       toast({ title: "تم التحديث", description: `تمت معالجة ${data.processedCount} سجل بناءً على القواعد المعتمدة.` });
     },
   });
