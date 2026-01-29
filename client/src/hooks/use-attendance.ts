@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { localStore } from "@/lib/localStorage";
-import { isValid, parseISO, format, differenceInMinutes } from "date-fns";
+import { isValid, parseISO, format } from "date-fns";
+import { type SpecialRule } from "@shared/schema";
 
 const safeParseDate = (dateStr: string) => {
   if (!dateStr) return null;
@@ -74,8 +75,8 @@ export function useCalculateAttendance() {
           const empPunches = punches.filter(p => safeFormatDate(p.timestamp.split(' ')[0]) === date && p.employeeCode === emp.code);
           const empMissions = missions.filter(m => safeFormatDate(m.date) === date && m.employeeCode === emp.code);
           const empLeaves = leaves.filter(l => l.employeeCode === emp.code && isDateInRange(date, l.startDate, l.endDate));
-          const empPerms = perms.filter(p => safeFormatDate(p.date) === date && p.employeeCode === emp.code);
-          const empRules = rules.filter(r => r.employeeCode === emp.code && (!r.startDate || isDateInRange(date, r.startDate, r.endDate || r.startDate)));
+          // perms not used in calculation yet
+          const empRules = rules.filter((r: SpecialRule) => r.scopeValues?.includes(emp.code) && (!r.dateFrom || isDateInRange(date, r.dateFrom, r.dateTo || r.dateFrom)));
 
           // Rule engine: Excused Not Present
           const isLeave = empLeaves.length > 0;
@@ -102,7 +103,7 @@ export function useCalculateAttendance() {
           let earlyPenalty = 0;
           let missingStampPenalty = 0;
           let absencePenalty = 0;
-          let penalties = [];
+          let penalties: any[] = [];
 
           if (!isSuppressed) {
             if (!firstPunch && !lastPunch) {
