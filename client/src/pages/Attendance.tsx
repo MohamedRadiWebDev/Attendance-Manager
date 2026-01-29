@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useAttendance, useCalculateAttendance } from "@/hooks/use-attendance";
 import { useEmployees } from "@/hooks/use-employees";
 import { normalizeArabic, buildSearchIndex, matchesSearch } from "@/lib/arabicSearch";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { ar } from "date-fns/locale";
 import { 
   Loader2, 
