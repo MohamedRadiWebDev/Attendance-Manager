@@ -56,9 +56,14 @@ export default function Attendance() {
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [monthFilter, setMonthFilter] = useState(format(new Date(), 'yyyy-MM'));
-  const { data: attendance, isLoading } = useAttendance(monthFilter);
-  const { data: employees } = useEmployees();
-  const { mutate: calculate, isPending: isCalculating } = useCalculateAttendance();
+  const attendanceQuery = useAttendance(monthFilter);
+  const attendance = (attendanceQuery.data as any[]) || [];
+  const isLoading = attendanceQuery.isLoading;
+  const employeesQuery = useEmployees();
+  const employees = (employeesQuery.data as any) || [];
+  const calculateMutation = useCalculateAttendance();
+  const isCalculating = calculateMutation.isPending;
+  const calculate = () => calculateMutation.mutate();
 
   const employeeMap = useMemo(() => {
     const map = new Map<string, { name: string; department: string; branch: string }>();
@@ -133,7 +138,7 @@ export default function Attendance() {
           <Input
             type="month"
             value={monthFilter}
-            onChange={(e: any) => setMonthFilter(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMonthFilter(e.target.value)}
             className="w-[200px]"
             data-testid="input-month-filter"
           />

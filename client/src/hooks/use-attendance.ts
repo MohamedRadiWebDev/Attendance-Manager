@@ -38,8 +38,11 @@ export function useAttendance(month?: string) {
     queryKey: [api.attendance.list.path, month],
     queryFn: async () => {
       const all = await localStore.getDailyAttendance();
+      console.log(`[DEBUG] Fetching attendance. Total records in store: ${all.length}, Month filter: ${month}`);
       if (!month) return all;
-      return all.filter(d => d.date.startsWith(month));
+      const filtered = all.filter(d => d.date.startsWith(month));
+      console.log(`[DEBUG] Filtered records for ${month}: ${filtered.length}`);
+      return filtered;
     },
   });
 }
@@ -50,6 +53,7 @@ export function useCalculateAttendance() {
 
   return useMutation({
     mutationFn: async (targetDate?: string) => {
+      console.log("[DEBUG] Starting calculation process...");
       const employees = await localStore.getEmployees();
       const punches = await localStore.getAllPunches();
       const missions = await localStore.getAllMissions();
@@ -57,6 +61,8 @@ export function useCalculateAttendance() {
       const perms = await localStore.getAllPermissions();
       const rules = await localStore.getSpecialRules();
       
+      console.log(`[DEBUG] Data loaded: ${employees.length} employees, ${punches.length} punches, ${missions.length} missions, ${leaves.length} leaves, ${rules.length} rules`);
+
       const processedRecords = [];
       const allDates = new Set<string>();
       
@@ -64,13 +70,18 @@ export function useCalculateAttendance() {
         const formatted = safeFormatDate(targetDate);
         if (formatted) allDates.add(formatted);
       } else {
-        punches.forEach(p => { const d = safeFormatDate(p.timestamp.split(' ')[0]); if (d) allDates.add(d); });
+        punches.forEach(p => { 
+          const d = safeFormatDate(p.timestamp.split(' ')[0]); 
+          if (d) allDates.add(d); 
+        });
         missions.forEach(m => { const d = safeFormatDate(m.date); if (d) allDates.add(d); });
         leaves.forEach(l => { const d = safeFormatDate(l.startDate); if (d) allDates.add(d); });
       }
 
+      console.log(`[DEBUG] Processing for unique dates: ${Array.from(allDates).join(', ')}`);
+
       for (const date of Array.from(allDates)) {
-        const dayOfWeek = new Date(date).getDay(); // 0=Sun, 6=Sat
+        const dayOfWeek = new Date(date).getDay();
         for (const emp of employees) {
           const empPunches = punches.filter(p => safeFormatDate(p.timestamp.split(' ')[0]) === date && p.employeeCode === emp.code);
           const empMissions = missions.filter(m => safeFormatDate(m.date) === date && m.employeeCode === emp.code);
@@ -80,12 +91,12 @@ export function useCalculateAttendance() {
           const isLeave = empLeaves.length > 0;
           const isMission = empMissions.length > 0;
           const isExempt = empRules.some(r => r.ruleType === 'attendance_exempt');
-          const isRest = dayOfWeek === 5; // Friday
+          const isRest = dayOfWeek === 5;
           const isSuppressed = isLeave || isMission || isExempt || isRest;
 
           let shiftStart = emp.shiftStart || "08:00";
           let shiftEnd = "16:00";
-          if (dayOfWeek === 6) { // Saturday
+          if (dayOfWeek === 6) {
             shiftEnd = emp.job === "خدمات معاونة" ? "15:00" : "14:00"; 
           } else {
             shiftEnd = "16:00";
@@ -148,13 +159,17 @@ export function useCalculateAttendance() {
           });
         }
       }
-      if (processedRecords.length > 0) await localStore.saveDailyAttendance(processedRecords as any);
-      // Force trigger storage event for cross-tab or current view update
+      console.log(`[DEBUG] Final processed records count: ${processedRecords.length}`);
+      if (processedRecords.length > 0) {
+        await localStore.saveDailyAttendance(processedRecords as any);
+        console.log("[DEBUG] Records saved to localStorage");
+      } else {
+        console.warn("[DEBUG] No records were processed. Check if employees and punches have matching codes/dates.");
+      }
       window.dispatchEvent(new Event('storage'));
       return { success: true, processedCount: processedRecords.length };
     },
     onSuccess: (data) => {
-      // Direct cache invalidation
       queryClient.invalidateQueries({ queryKey: [api.attendance.list.path] });
       toast({ title: "تم التحديث", description: `تمت معالجة ${data.processedCount} سجل بناءً على القواعد المعتمدة.` });
     },

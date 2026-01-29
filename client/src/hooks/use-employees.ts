@@ -1,13 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { localStore } from "@/lib/localStorage";
 import { api } from "@shared/routes";
+import { type Employee } from "@shared/schema";
 
 export function useEmployees() {
-  return useQuery({
+  return useQuery<Employee[]>({
     queryKey: [api.employees.list.path],
-    queryFn: async () => {
-      const res = await fetch(api.employees.list.path, { credentials: "include" });
-      if (!res.ok) throw new Error("فشل جلب بيانات الموظفين");
-      return api.employees.list.responses[200].parse(await res.json());
-    },
+    queryFn: () => localStore.getEmployees(),
   });
 }

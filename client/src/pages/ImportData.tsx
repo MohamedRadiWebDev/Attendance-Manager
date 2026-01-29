@@ -23,7 +23,10 @@ const columnSpecs = {
 };
 
 export default function ImportData() {
-  const { mutate: uploadFile, isPending, data: lastResult } = useImportFile();
+  const importMutation = useImportFile();
+  const uploadFile = importMutation.mutate;
+  const isPending = importMutation.isPending;
+  const lastResult = importMutation.data as any;
   const [activeTab, setActiveTab] = useState<'punches' | 'master' | 'missions' | 'leaves'>('master');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
