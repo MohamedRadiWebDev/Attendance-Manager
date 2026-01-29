@@ -111,6 +111,10 @@ export function useImportFile() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries();
+      
+      // Notify components they might need to recalculate
+      window.dispatchEvent(new CustomEvent('data_imported', { detail: { type: data.type } }));
+
       toast({ 
         title: "تم الاستيراد بنجاح",
         description: `تم استيراد ${data.count} سجل بنجاح في قسم ${data.type === 'master' ? 'الموظفين' : data.type === 'punches' ? 'البصمات' : data.type === 'missions' ? 'المأموريات' : 'الإجازات'}.`

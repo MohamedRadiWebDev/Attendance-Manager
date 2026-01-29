@@ -61,6 +61,18 @@ export default function Attendance() {
   const { data: employees } = useEmployees();
   const { mutate: calculate, isPending: isCalculating } = useCalculateAttendance();
 
+  // Auto-calculate if data was just imported
+  const [hasCalculatedForImport, setHasCalculatedForImport] = useState(false);
+  useMemo(() => {
+    const handler = () => {
+      if (!isCalculating) {
+        calculate();
+      }
+    };
+    window.addEventListener('data_imported', handler);
+    return () => window.removeEventListener('data_imported', handler);
+  }, [calculate, isCalculating]);
+
   const employeeMap = useMemo(() => {
     const map = new Map<string, { name: string; department: string; branch: string }>();
     employees?.forEach((e: any) => {
