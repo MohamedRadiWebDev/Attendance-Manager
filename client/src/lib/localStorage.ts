@@ -20,6 +20,11 @@ const KEYS = {
   ID_COUNTERS: 'attendance_counters'
 };
 
+// Quota management: Limit logs and records to save space
+const MAX_LOG_SIZE = 500; // chars per record
+const MAX_PUNCHES = 50000;
+const MAX_ATTENDANCE = 10000;
+
 class LocalStorageProvider {
   private getItem<T>(key: string, defaultValue: T): T {
     const data = localStorage.getItem(key);
@@ -34,11 +39,36 @@ class LocalStorageProvider {
 
   private setItem<T>(key: string, value: T): void {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      const stringified = JSON.stringify(value);
+      localStorage.setItem(key, stringified);
       window.dispatchEvent(new Event('storage'));
     } catch (e) {
-      console.error(`[DEBUG] LocalStorage write error for key "${key}":`, e);
+      if (e instanceof Error && e.name === 'QuotaExceededError') {
+        console.error(`[DEBUG] Quota exceeded for "${key}". Attempting cleanup...`);
+        this.emergencyCleanup();
+        // Retry once after cleanup
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (retryError) {
+          console.error(`[DEBUG] Retry failed after cleanup:`, retryError);
+        }
+      } else {
+        console.error(`[DEBUG] LocalStorage write error for key "${key}":`, e);
+      }
     }
+  }
+
+  private emergencyCleanup(): void {
+    // Keep employees and rules, trim large transactional data
+    const punches = this.getItem<Punch[]>(KEYS.PUNCHES, []);
+    if (punches.length > 10000) {
+      this.setItem(KEYS.PUNCHES, punches.slice(-10000));
+    }
+    const att = this.getItem<DailyAttendance[]>(KEYS.ATTENDANCE, []);
+    if (att.length > 2000) {
+      this.setItem(KEYS.ATTENDANCE, att.slice(-2000));
+    }
+    console.warn("[DEBUG] Emergency cleanup performed: trimmed punches and attendance records.");
   }
 
   private getNextIds(type: string, count: number): number[] {
@@ -75,11 +105,17 @@ class LocalStorageProvider {
   }
 
   async addPunches(newPunches: InsertPunch[]): Promise<void> {
-    const punches = this.getItem<Punch[]>(KEYS.PUNCHES, []);
+    let punches = this.getItem<Punch[]>(KEYS.PUNCHES, []);
     const ids = this.getNextIds('punch', newPunches.length);
     newPunches.forEach((p, idx) => {
       punches.push({ ...p, id: ids[idx] } as Punch);
     });
+    
+    // Limit to MAX_PUNCHES
+    if (punches.length > MAX_PUNCHES) {
+      punches = punches.slice(-MAX_PUNCHES);
+    }
+    
     this.setItem(KEYS.PUNCHES, punches);
     console.log(`[DEBUG] Saved ${newPunches.length} punches. Total now: ${punches.length}`);
   }
@@ -89,7 +125,7 @@ class LocalStorageProvider {
   }
 
   async saveDailyAttendance(records: DailyAttendance[]): Promise<void> {
-    const existing = this.getItem<DailyAttendance[]>(KEYS.ATTENDANCE, []);
+    let existing = this.getItem<DailyAttendance[]>(KEYS.ATTENDANCE, []);
     const map = new Map<string, DailyAttendance>();
     existing.forEach(d => map.set(`${d.employeeCode}_${d.date}`, d));
     
@@ -101,10 +137,20 @@ class LocalStorageProvider {
       const key = `${r.employeeCode}_${r.date}`;
       const existingRecord = map.get(key);
       const id = existingRecord?.id || ids[idIdx++];
-      map.set(key, { ...r, id } as DailyAttendance);
+      
+      // Trim logs to save space
+      const trimmedLogs = r.logs?.map(l => l.substring(0, MAX_LOG_SIZE)) || [];
+      
+      map.set(key, { ...r, id, logs: trimmedLogs } as DailyAttendance);
     });
     
-    this.setItem(KEYS.ATTENDANCE, Array.from(map.values()));
+    let allRecords = Array.from(map.values());
+    // Limit to MAX_ATTENDANCE
+    if (allRecords.length > MAX_ATTENDANCE) {
+      allRecords = allRecords.slice(-MAX_ATTENDANCE);
+    }
+    
+    this.setItem(KEYS.ATTENDANCE, allRecords);
   }
 
   async getDailyAttendance(): Promise<DailyAttendance[]> {
