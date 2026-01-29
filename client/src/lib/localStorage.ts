@@ -27,7 +27,7 @@ class LocalStorageProvider {
     try {
       return JSON.parse(data);
     } catch (e) {
-      console.error(`Error parsing localStorage key "${key}":`, e);
+      console.error(`[DEBUG] LocalStorage read error for key "${key}":`, e);
       return defaultValue;
     }
   }
@@ -35,10 +35,10 @@ class LocalStorageProvider {
   private setItem<T>(key: string, value: T): void {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-      // Dispatch storage event for same-window updates
+      console.log(`[DEBUG] Saved to LocalStorage: ${key}`, value);
       window.dispatchEvent(new Event('storage'));
     } catch (e) {
-      console.error(`Error setting localStorage key "${key}":`, e);
+      console.error(`[DEBUG] LocalStorage write error for key "${key}":`, e);
     }
   }
 
@@ -52,11 +52,6 @@ class LocalStorageProvider {
 
   async getEmployees(): Promise<Employee[]> {
     return this.getItem<Employee[]>(KEYS.EMPLOYEES, []);
-  }
-
-  async getEmployee(code: string): Promise<Employee | undefined> {
-    const employees = await this.getEmployees();
-    return employees.find(e => e.code === code);
   }
 
   async upsertEmployee(employee: InsertEmployee): Promise<Employee> {
@@ -87,14 +82,6 @@ class LocalStorageProvider {
     return this.getItem(KEYS.PUNCHES, []);
   }
 
-  async getPunches(employeeCode: string, date: string): Promise<Punch[]> {
-    const punches = await this.getAllPunches();
-    return punches.filter(p => 
-      p.employeeCode === employeeCode && 
-      p.timestamp.startsWith(date)
-    );
-  }
-
   async saveDailyAttendance(records: DailyAttendance[]): Promise<void> {
     const existing = this.getItem<DailyAttendance[]>(KEYS.ATTENDANCE, []);
     const map = new Map<string, DailyAttendance>();
@@ -123,16 +110,6 @@ class LocalStorageProvider {
     return this.getItem<Mission[]>(KEYS.MISSIONS, []);
   }
 
-  async addPermissions(items: InsertPermission[]): Promise<void> {
-    const perms = this.getItem<Permission[]>(KEYS.PERMISSIONS, []);
-    items.forEach(i => perms.push({ ...i, id: this.getNextId('perm') } as Permission));
-    this.setItem(KEYS.PERMISSIONS, perms);
-  }
-
-  async getAllPermissions(): Promise<Permission[]> {
-    return this.getItem<Permission[]>(KEYS.PERMISSIONS, []);
-  }
-
   async addLeaves(items: InsertLeave[]): Promise<void> {
     const leaves = this.getItem<Leave[]>(KEYS.LEAVES, []);
     items.forEach(i => leaves.push({ ...i, id: this.getNextId('leave') } as Leave));
@@ -141,25 +118,6 @@ class LocalStorageProvider {
 
   async getAllLeaves(): Promise<Leave[]> {
     return this.getItem<Leave[]>(KEYS.LEAVES, []);
-  }
-
-  async getMissions(code: string, date: string): Promise<Mission[]> {
-    const missions = await this.getAllMissions();
-    return missions.filter(m => m.employeeCode === code && m.date === date);
-  }
-
-  async getPermissions(code: string, date: string): Promise<Permission[]> {
-    const perms = await this.getAllPermissions();
-    return perms.filter(p => p.employeeCode === code && p.date === date);
-  }
-
-  async getLeaves(code: string, date: string): Promise<Leave[]> {
-    const leaves = await this.getAllLeaves();
-    return leaves.filter(l => 
-      l.employeeCode === code && 
-      date >= l.startDate && 
-      date <= l.endDate
-    );
   }
 
   async getSpecialRules(): Promise<SpecialRule[]> {
@@ -173,19 +131,10 @@ class LocalStorageProvider {
       id: this.getNextId('sc'),
       enabled: rule.enabled ?? true,
       priority: rule.priority ?? 0,
-      scopeValues: rule.scopeValues ?? null,
-      daysOfWeek: rule.daysOfWeek ?? null,
-      params: rule.params ?? null,
-      notes: rule.notes ?? null
     } as SpecialRule;
     rules.push(newRule);
     this.setItem(KEYS.RULES, rules);
     return newRule;
-  }
-
-  async deleteSpecialRule(id: number): Promise<void> {
-    const rules = await this.getSpecialRules();
-    this.setItem(KEYS.RULES, rules.filter(r => r.id !== id));
   }
 
   async clearAll(): Promise<void> {
