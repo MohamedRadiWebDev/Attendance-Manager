@@ -5,13 +5,15 @@ import {
   CalendarDays, 
   FileUp, 
   AlertTriangle, 
-  FileText 
+  FileText,
+  Fingerprint
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "لوحة المعلومات", href: "/", icon: LayoutDashboard },
   { name: "الحضور والانصراف", href: "/attendance", icon: CalendarDays },
+  { name: "حركات البصمة", href: "/punches", icon: Fingerprint },
   { name: "المأموريات", href: "/missions", icon: FileText },
   { name: "الإجازات", href: "/leaves", icon: FileText },
   { name: "استيراد البيانات", href: "/import", icon: FileUp },

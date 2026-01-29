@@ -35,19 +35,23 @@ class LocalStorageProvider {
   private setItem<T>(key: string, value: T): void {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-      console.log(`[DEBUG] Saved to LocalStorage: ${key}`, value);
       window.dispatchEvent(new Event('storage'));
     } catch (e) {
       console.error(`[DEBUG] LocalStorage write error for key "${key}":`, e);
     }
   }
 
-  private getNextId(type: string): number {
+  private getNextIds(type: string, count: number): number[] {
     const counters = this.getItem(KEYS.ID_COUNTERS, {} as any);
-    const nextId = (counters[type] || 1);
-    counters[type] = nextId + 1;
+    const startId = (counters[type] || 1);
+    const ids = Array.from({ length: count }, (_, i) => startId + i);
+    counters[type] = startId + count;
     this.setItem(KEYS.ID_COUNTERS, counters);
-    return nextId;
+    return ids;
+  }
+
+  private getNextId(type: string): number {
+    return this.getNextIds(type, 1)[0];
   }
 
   async getEmployees(): Promise<Employee[]> {
@@ -72,10 +76,12 @@ class LocalStorageProvider {
 
   async addPunches(newPunches: InsertPunch[]): Promise<void> {
     const punches = this.getItem<Punch[]>(KEYS.PUNCHES, []);
-    newPunches.forEach(p => {
-      punches.push({ ...p, id: this.getNextId('punch') } as Punch);
+    const ids = this.getNextIds('punch', newPunches.length);
+    newPunches.forEach((p, idx) => {
+      punches.push({ ...p, id: ids[idx] } as Punch);
     });
     this.setItem(KEYS.PUNCHES, punches);
+    console.log(`[DEBUG] Saved ${newPunches.length} punches. Total now: ${punches.length}`);
   }
 
   async getAllPunches(): Promise<Punch[]> {
@@ -87,9 +93,14 @@ class LocalStorageProvider {
     const map = new Map<string, DailyAttendance>();
     existing.forEach(d => map.set(`${d.employeeCode}_${d.date}`, d));
     
+    const newRecordsToGenIds = records.filter(r => !map.has(`${r.employeeCode}_${r.date}`));
+    const ids = this.getNextIds('att', newRecordsToGenIds.length);
+    
+    let idIdx = 0;
     records.forEach(r => {
       const key = `${r.employeeCode}_${r.date}`;
-      const id = map.get(key)?.id || this.getNextId('att');
+      const existingRecord = map.get(key);
+      const id = existingRecord?.id || ids[idIdx++];
       map.set(key, { ...r, id } as DailyAttendance);
     });
     
@@ -102,7 +113,8 @@ class LocalStorageProvider {
 
   async addMissions(items: InsertMission[]): Promise<void> {
     const missions = this.getItem<Mission[]>(KEYS.MISSIONS, []);
-    items.forEach(i => missions.push({ ...i, id: this.getNextId('mission') } as Mission));
+    const ids = this.getNextIds('mission', items.length);
+    items.forEach((i, idx) => missions.push({ ...i, id: ids[idx] } as Mission));
     this.setItem(KEYS.MISSIONS, missions);
   }
 
@@ -112,7 +124,8 @@ class LocalStorageProvider {
 
   async addLeaves(items: InsertLeave[]): Promise<void> {
     const leaves = this.getItem<Leave[]>(KEYS.LEAVES, []);
-    items.forEach(i => leaves.push({ ...i, id: this.getNextId('leave') } as Leave));
+    const ids = this.getNextIds('leave', items.length);
+    items.forEach((i, idx) => leaves.push({ ...i, id: ids[idx] } as Leave));
     this.setItem(KEYS.LEAVES, leaves);
   }
 
