@@ -62,11 +62,10 @@ export default function Attendance() {
   const { mutate: calculate, isPending: isCalculating } = useCalculateAttendance();
 
   // Auto-calculate if data was just imported
-  const [hasCalculatedForImport, setHasCalculatedForImport] = useState(false);
   useMemo(() => {
     const handler = () => {
       if (!isCalculating) {
-        calculate();
+        calculate(undefined);
       }
     };
     window.addEventListener('data_imported', handler);
@@ -155,7 +154,7 @@ export default function Attendance() {
         
         <div className="flex gap-3">
           <Button
-            onClick={() => calculate()}
+            onClick={() => calculate(undefined)}
             disabled={isCalculating}
             data-testid="button-calculate"
           >
